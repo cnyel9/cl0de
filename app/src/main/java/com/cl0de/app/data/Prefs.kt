@@ -102,7 +102,9 @@ class Prefs(ctx: Context) {
 
     // Profile
     var userName by str("user_name", "")
-    /** Language for speech recognition and read-aloud: "" means the phone's language. */
+    /** App language: "id" (default) or "en". Drives the agent's reply language and default speech language. */
+    var appLang by str("app_lang", "id")
+    /** Language for speech recognition and read-aloud: "" means the app language. */
     var speechLang by str("speech_lang", "")
     var avatarPath by str("avatar_path", "")
 

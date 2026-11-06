@@ -165,6 +165,25 @@ The user talks to you from a phone app. It cannot see your terminal or your disk
         sync()
     }
 
+    private const val LANG_START = "<!-- cl0de-lang:start -->"
+    private const val LANG_END = "<!-- cl0de-lang:end -->"
+
+    /**
+     * The reply-language rule from Settings, kept as one marked block inside the user rules.
+     * Only that block is replaced; every other user rule stays exactly as it was.
+     */
+    fun setLanguageRule(line: String) {
+        runCatching {
+            val rules = userRules()
+            val a = rules.indexOf(LANG_START)
+            val b = rules.indexOf(LANG_END)
+            val without = if (a >= 0 && b > a) (rules.substring(0, a) + rules.substring(b + LANG_END.length)).trim() else rules
+            val block = "$LANG_START\n$line\n$LANG_END"
+            val next = listOf(without, block).filter { it.isNotEmpty() }.joinToString("\n\n")
+            if (next != rules) saveUserRules(next)
+        }
+    }
+
     fun addNote(text: String) {
         runCatching {
             dir().mkdirs()
