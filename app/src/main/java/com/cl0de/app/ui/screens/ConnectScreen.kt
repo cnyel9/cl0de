@@ -70,7 +70,6 @@ class FreeProvider(val id: String, val title: String, val note: String, val url:
 
 val freeProviders = listOf(
     FreeProvider("github-copilot", "GitHub", "Copilot · free plan", "", null, "GitHub"),
-    FreeProvider("google", "Google", "Gemini · free tier", "https://aistudio.google.com/apikey", Regex("AIza[0-9A-Za-z_\\-]{30,}"), "Google AI Studio"),
     FreeProvider("groq", "Groq", "Fast open models · free tier", "https://console.groq.com/keys", Regex("gsk_[A-Za-z0-9]{30,}"), "Groq Console"),
     FreeProvider("openrouter", "OpenRouter", "Models marked :free", "https://openrouter.ai/settings/keys", Regex("sk-or-[A-Za-z0-9_\\-]{20,}"), "OpenRouter"),
 )

@@ -119,7 +119,6 @@ fun Onboarding() {
         prefs.onboarded = true
         when (acc) {
             "github" -> Graph.chats.openRequest.value = "route:connect:github-copilot"
-            "google" -> Graph.chats.openRequest.value = "route:connect:google"
             "opencode" -> Graph.chats.openRequest.value = "route:console:"
         }
     }
@@ -344,7 +343,6 @@ private fun AccountStep(rt: RuntimeState, chosen: String?, onPick: (String) -> U
         Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             AccountOption("free", chosen, ready, Ic.Sparkle, "Start free", "No account — free models right away", primary = true, onPick = onPick)
             AccountOption("github", chosen, ready, Ic.GitHub, "Continue with GitHub", "Copilot's free models", onPick = onPick)
-            AccountOption("google", chosen, ready, Ic.Globe, "Continue with Google", "Gemini's free tier", onPick = onPick)
             AccountOption("opencode", chosen, ready, Ic.Key, "OpenCode account", "Zen and Go plans", onPick = onPick)
         }
         if (rt is RuntimeState.InstallFailed) {
