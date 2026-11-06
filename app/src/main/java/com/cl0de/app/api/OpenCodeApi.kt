@@ -98,6 +98,15 @@ class OpenCodeApi(private val prefs: Prefs) {
         (runCatching { OcJson.parseToJsonElement(text) as? JsonObject }.getOrNull())?.takeIf { it.bool("healthy") == true }?.str("version")
     }
 
+    /** For the watchdog: a patient timeout, so a busy-but-alive server on a slow phone is not mistaken for a hung one. */
+    private val healthPatientHttp by lazy { http.newBuilder().callTimeout(20, TimeUnit.SECONDS).build() }
+
+    suspend fun healthVersionPatient(): String? = healthPatientHttp.newCall(request("/global/health").build()).await().use { r ->
+        val text = withContext(Dispatchers.IO) { r.body.string() }
+        if (!r.isSuccessful) throw ApiException(r.code, "health ${r.code}")
+        (runCatching { OcJson.parseToJsonElement(text) as? JsonObject }.getOrNull())?.takeIf { it.bool("healthy") == true }?.str("version")
+    }
+
     /** Checks another server before switching to it: does it answer and does the password fit. null means fine, otherwise the reason. */
     suspend fun reachable(url: String, password: String): String? = try {
         val req = Request.Builder().url("$url/global/health").header("Authorization", Credentials.basic("opencode", password)).build()
