@@ -242,6 +242,10 @@ fun ConfigEditorScreen(nav: Nav) {
     var importMsg by remember { mutableStateOf<String?>(null) }
     var importing by remember { mutableStateOf(false) }
     val importCtx = LocalContext.current
+    val pretty = remember { Json { prettyPrint = true } }
+    suspend fun load() {
+        text = runCatching { pretty.encodeToString(JsonObject.serializer(), Graph.api.config()) }.getOrElse { "{}" }; loaded = true
+    }
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
             importing = true; importMsg = null
@@ -253,10 +257,6 @@ fun ConfigEditorScreen(nav: Nav) {
                 .onFailure { importMsg = it.message ?: com.cl0de.app.data.AppLang.s("Impor gagal", "Import failed") }
             importing = false
         }
-    }
-    val pretty = remember { Json { prettyPrint = true } }
-    suspend fun load() {
-        text = runCatching { pretty.encodeToString(JsonObject.serializer(), Graph.api.config()) }.getOrElse { "{}" }; loaded = true
     }
     LaunchedEffect(Unit) { load() }
     Column(Modifier.fillMaxSize().screenBackdrop("MoreScreens3")) {
