@@ -18,7 +18,7 @@ OC=""
 if command -v opencode >/dev/null 2>&1 && opencode --version 2>/dev/null | grep -Eq '(^|[^0-9])1\.'; then
   OC=opencode
 else
-  CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/Cl0de"
+  CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/cl0de"
   DIR="$CACHE/opencode-$OC_V"
   case "$(uname -s)-$(uname -m)" in
     Linux-x86_64) ASSET=opencode-linux-x64.tar.gz ;;
