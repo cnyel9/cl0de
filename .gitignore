@@ -7,3 +7,6 @@ local.properties
 *.jks
 *.keystore
 dist/
+
+# sherpa-onnx AAR is fetched by the build workflow (pinned release + sha256)
+app/libs/*.aar

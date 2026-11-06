@@ -15,8 +15,8 @@ android {
         // and with targetSdk >= 29 Android forbids exec from app_data_file (same as Termux).
         // The APK is distributed as a file, not through Play.
         targetSdk = 28
-        versionCode = 5
-        versionName = "0.0.1 beta-5"
+        versionCode = 6
+        versionName = "0.0.1 beta-6"
         ndk { abiFilters += "arm64-v8a" }
     }
 
@@ -87,6 +87,10 @@ dependencies {
     implementation(libs.coil.network)
     implementation(libs.gms.code.scanner)
     implementation(libs.androidx.fragment)
+    // Offline speech recognition (sherpa-onnx v2.0.1, official release AAR as a
+    // local file: deterministic for CI, unlike JitPack. Only arm64-v8a is packed,
+    // see the abiFilters in defaultConfig.)
+    implementation(files("libs/sherpa-onnx-2.0.1.aar"))
 
     testImplementation(libs.junit)
 }
