@@ -46,6 +46,10 @@ object ConfigImport {
         val providers = (parsed["provider"] as? JsonObject) ?: JsonObject(emptyMap())
         val models = providers.values.sumOf { (it as? JsonObject)?.get("models")?.let { m -> (m as? JsonObject)?.size ?: 0 } ?: 0 }
         Graph.api.patchGlobalConfig(parsed)
+        // Same reload the FreeModels flow applies after it changes the global config,
+        // so the imported providers and models appear without an app restart.
+        runCatching { Graph.api.disposeAll() }
+        runCatching { Graph.catalog.refresh() }
         return Result(providers.size, models)
     }
 

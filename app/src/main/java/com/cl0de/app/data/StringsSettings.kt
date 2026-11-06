@@ -172,6 +172,8 @@ object SSet {
     val configDescription get() = AppLang.s("Semua yang didukung OpenCode di opencode.json: model, agen, MCP, izin, formatter, instruksi, keybinds. Perubahan digabung dan langsung diterapkan.", "Everything OpenCode supports in opencode.json: models, agents, MCP, permissions, formatters, instructions, keybinds. Changes are merged and applied at once.")
     val notValidJson get() = AppLang.s("Bukan objek JSON yang valid", "Not valid JSON object")
     val saved get() = AppLang.s("Tersimpan", "Saved")
+    val savedModelsReloaded get() = AppLang.s("Tersimpan, daftar model dimuat ulang", "Saved, model list reloaded")
+    val listReloaded get() = AppLang.s("Daftar model dimuat ulang.", "Model list reloaded.")
     fun importedCounts(providers: Int, models: Int) = AppLang.s("Berhasil masuk: $providers provider, $models model.", "Imported: $providers providers, $models models.")
     val importFailed get() = AppLang.s("Impor gagal", "Import failed")
     val importFromOldApp get() = AppLang.s("Impor dari aplikasi lama", "Import from the old app")
