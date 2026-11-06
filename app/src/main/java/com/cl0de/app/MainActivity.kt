@@ -23,7 +23,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handle(i: android.content.Intent?) {
-        // cl0udly://connect?… — a QR code from a computer, opened by the camera or as a link
+        // Cl0de://connect?… — a QR code from a computer, opened by the camera or as a link
         if (i?.action == android.content.Intent.ACTION_VIEW) i.dataString?.let { com.cl0de.app.data.ConnectLink.offer(it) }
         i?.getStringExtra("session")?.let { Graph.chats.openRequest.value = it }
         if (i?.action == android.content.Intent.ACTION_SEND || i?.action == android.content.Intent.ACTION_SEND_MULTIPLE) {

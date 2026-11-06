@@ -142,7 +142,7 @@ def outro(c, t):
     text(c, (W // 2, y0 + hh + 70), "mobile · v0.0.1 beta-3", "monob", 50, PEACH, "ma", out_cubic((lt - BEAT * 2) / 0.3))
     a = out_cubic((lt - BEAT * 3) / 0.3)
     if a > 0:
-        s = "github.com/mistqkw/opencode-mobile"
+        s = "github.com/cnyel9/cl0de"
         f = font("mono", 36)
         wd = ImageDraw.Draw(c).textlength(s, font=f)
         x0, yy = W / 2 - wd / 2 - 36, y0 + hh + 200 + (1 - a) * 30

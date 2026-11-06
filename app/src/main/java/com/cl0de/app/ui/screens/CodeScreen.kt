@@ -255,7 +255,7 @@ private fun AddDeviceSheet(onDismiss: () -> Unit) {
                     com.google.mlkit.vision.codescanner.GmsBarcodeScanning.getClient(ctx, opts).startScan()
                         .addOnSuccessListener { b ->
                             if (com.cl0de.app.data.ConnectLink.offer(b.rawValue.orEmpty())) onDismiss()
-                            else error = "That's not a cl0udly connection code"
+                            else error = "That's not a Cl0de connection code"
                         }
                         .addOnFailureListener { error = "The scanner isn't available. Point your camera app at the code instead." }
                 }.padding(vertical = 14.dp),
@@ -293,4 +293,4 @@ private fun AddDeviceSheet(onDismiss: () -> Unit) {
 }
 
 /** Command for the computer: starts OpenCode with a password and shows a QR code for the phone. */
-private const val QR_COMMAND = "curl -fsSL https://raw.githubusercontent.com/mistqkw/opencode-mobile/main/tools/connect-qr.sh | sh"
+private const val QR_COMMAND = "curl -fsSL https://raw.githubusercontent.com/cnyel9/cl0de/main/tools/connect-qr.sh | sh"

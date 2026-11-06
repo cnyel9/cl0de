@@ -144,8 +144,8 @@ fun SettingsScreen(nav: Nav, onMenu: () -> Unit) {
             Spacer(Modifier.height(16.dp))
             SettingsGroup {
                 SettingsRow("Interface", subtitle = com.cl0de.app.ui.theme.Looks.of(prefs.edition).title, icon = Ic.Laptop, onClick = { nav.push(Route.Edition) })
-                // the mascot tab: only in the cl0udly look
-                if (Oc.look.id == "cloud") SettingsRow("cl0udly", subtitle = "Mascot, outfits and games", icon = Ic.Cloud, onClick = { nav.push(Route.MascotSettings) })
+                // the mascot tab: only in the Cl0de look
+                if (Oc.look.id == "cloud") SettingsRow("Cl0de", subtitle = "Mascot, outfits and games", icon = Ic.Cloud, onClick = { nav.push(Route.MascotSettings) })
                 SettingsRow("Color mode", subtitle = prefs.colorMode.replaceFirstChar { it.uppercase() }, icon = Ic.Moon, onClick = { dialog = "color" })
                 SettingsRow("Font style", subtitle = if (prefs.fontStyle == "default") "Default" else "System", icon = Ic.FontSize, onClick = { nav.push(Route.Appearance) })
                 SettingsRow("Voice", subtitle = com.cl0de.app.data.Speech.label(), icon = Ic.Waveform, onClick = { dialog = "voice" })

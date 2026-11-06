@@ -12,8 +12,8 @@ class AppIcon(val id: String, val label: String, val component: String, val bg: 
 object AppIcons {
     val all = listOf(
     // for the interface looks
-    AppIcon("look_cloud", "cl0udly", "com.cl0de.app.IconLookCloud", Color(0xFF232428), R.drawable.ic_fg_look_cloud),
-    AppIcon("cloud_light", "cl0udly · light", "com.cl0de.app.IconCloudLight", Color(0xFFF4F5F7), R.drawable.ic_fg_cloud_light),
+    AppIcon("look_cloud", "Cl0de", "com.cl0de.app.IconLookCloud", Color(0xFF232428), R.drawable.ic_fg_look_cloud),
+    AppIcon("cloud_light", "Cl0de · light", "com.cl0de.app.IconCloudLight", Color(0xFFF4F5F7), R.drawable.ic_fg_cloud_light),
     AppIcon("look_claude", "Claude", "com.cl0de.app.IconLookClaude", Color(0xFFD97757), R.drawable.ic_fg_look_claude),
     AppIcon("look_terminal", "OpenCode · Terminal", "com.cl0de.app.IconLookTerminal", Color(0xFF0A0A0A), R.drawable.ic_fg_look_terminal),
     AppIcon("look_desktop", "OpenCode · Desktop", "com.cl0de.app.IconLookDesktop", Color(0xFF1E1E1E), R.drawable.ic_fg_look_desktop),

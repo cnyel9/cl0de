@@ -1,4 +1,4 @@
-# OpenCode mobile
+# Cl0de
 
 An Android app that runs its own OpenCode server on the phone. It unpacks Ubuntu 24.04 in proot (no root), starts `opencode serve` on 127.0.0.1 and gives it a mobile UI. You don't need a computer, but you can also connect to OpenCode running on one.
 
@@ -28,9 +28,9 @@ Current version: **v0.0.1 beta-4**. Android 8+, arm64. Unofficial client.
 
 **Interrupted tasks.** If Android kills the server in the middle of a task, the chat offers Continue or Cancel when you come back. Progress can also be shown on the lock screen, with Allow and Deny buttons for permission requests.
 
-**Interfaces.** The default look is cl0udly: graphite with quiet pixel clouds and a small cloud that acts out what the agent is doing. It reacts to taps, petting, shaking and charging, dresses up for holidays and has its own room with ping-pong. In this look the assistant introduces itself as cl0udly and names its real model when asked. All of it can be tuned in Settings → cl0udly. Several other looks are in Settings, including OpenCode Desktop and OpenCode Terminal. The app icon can follow the look.
+**Interfaces.** The default look is Cl0de: graphite with quiet pixel clouds and a small cloud that acts out what the agent is doing. It reacts to taps, petting, shaking and charging, dresses up for holidays and has its own room with ping-pong. In this look the assistant introduces itself as Cl0de and names its real model when asked. All of it can be tuned in Settings → Cl0de. Several other looks are in Settings, including OpenCode Desktop and OpenCode Terminal. The app icon can follow the look.
 
-**Your computer.** Remote devices → Add device → Scan QR code. On the computer run `curl -fsSL https://raw.githubusercontent.com/mistqkw/opencode-mobile/main/tools/connect-qr.sh | sh`: it starts OpenCode 1.x on your local network with a new password and prints a QR code. The phone and computer need to be on the same network.
+**Your computer.** Remote devices → Add device → Scan QR code. On the computer run `curl -fsSL https://raw.githubusercontent.com/cnyel9/cl0de/main/tools/connect-qr.sh | sh`: it starts OpenCode 1.x on your local network with a new password and prints a QR code. The phone and computer need to be on the same network.
 
 **Memory.** The agent keeps facts in markdown files under `/root/memory` and sorts them by topic. You can view and edit them in Settings → Memory.
 
@@ -82,4 +82,4 @@ Phones other than a Pixel, Android 14–16 on other firmware, light themes of ev
 
 The app's own code is MIT (see `LICENSE`).
 
-OpenCode mobile is an unofficial client and is not affiliated with the OpenCode developers. "OpenCode" is the name of their project (MIT). The app includes proot and libtalloc from Termux (GPL-2.0 / LGPL-3.0), whose sources are in the Termux project, and downloads Ubuntu Base 24.04 and OpenCode on first launch. Those components keep their own licenses. Fonts: Inter, Source Serif 4, Unbounded and JetBrains Mono, all SIL OFL 1.1.
+Cl0de is an unofficial client and is not affiliated with the OpenCode developers. "OpenCode" is the name of their project (MIT). The app includes proot and libtalloc from Termux (GPL-2.0 / LGPL-3.0), whose sources are in the Termux project, and downloads Ubuntu Base 24.04 and OpenCode on first launch. Those components keep their own licenses. Fonts: Inter, Source Serif 4, Unbounded and JetBrains Mono, all SIL OFL 1.1.
