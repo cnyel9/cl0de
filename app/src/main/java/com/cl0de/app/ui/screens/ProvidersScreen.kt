@@ -29,6 +29,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SAcct
 import com.cl0de.app.api.AllProvider
 import com.cl0de.app.api.AuthMethod
 import com.cl0de.app.api.str
@@ -71,30 +73,30 @@ fun ProvidersScreen(nav: Nav) {
         .sortedWith(compareBy({ popular.indexOf(it.id).let { i -> if (i < 0) 999 else i } }, { it.name.lowercase() }))
 
     Column(Modifier.fillMaxSize().screenBackdrop("ProvidersScreen1")) {
-        TopBar("Providers", left = { IconBtn(Ic.Back, { nav.pop() }) })
+        TopBar(S.providers, left = { IconBtn(Ic.Back, { nav.pop() }) })
         LazyColumn(Modifier.weight(1f).navigationBarsPadding(), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 32.dp)) {
             item {
                 Box(Modifier.padding(top = 4.dp)) {
                     SettingsGroup {
-                        SettingsRow("Free models", subtitle = "Copilot, or no account at all", icon = Ic.Sparkle, chevron = true, onClick = { nav.push(com.cl0de.app.ui.Route.Login) })
+                        SettingsRow(SAcct.freeModels, subtitle = SAcct.copilotOrNoAccount, icon = Ic.Sparkle, chevron = true, onClick = { nav.push(com.cl0de.app.ui.Route.Login) })
                     }
                 }
             }
-            item { SectionLabel("Connected") }
+            item { SectionLabel(SAcct.connected) }
             item {
-                if (connected.isEmpty()) Txt("Nothing connected yet", Modifier.padding(horizontal = 20.dp), size = 16.sp, color = c.textDim)
+                if (connected.isEmpty()) Txt(SAcct.nothingConnectedYet, Modifier.padding(horizontal = 20.dp), size = 16.sp, color = c.textDim)
                 else SettingsGroup {
                     connected.forEach { p ->
-                        SettingsRow(p.name.ifBlank { p.id }, subtitle = "${p.models.size} models", icon = Ic.Key, trailing = {
+                        SettingsRow(p.name.ifBlank { p.id }, subtitle = SAcct.modelsCount(p.models.size), icon = Ic.Key, trailing = {
                             if (p.id == "opencode-go") Chip("Go", color = c.bg, bg = c.text)
-                            SmallButton("Disconnect", { disconnect = p.id }, danger = true)
+                            SmallButton(SAcct.disconnect, { disconnect = p.id }, danger = true)
                         })
                     }
                 }
             }
             item {
-                SectionLabel("Add provider")
-                Box(Modifier.padding(horizontal = 16.dp)) { OcTextField(query, { query = it }, placeholder = "Search providers") }
+                SectionLabel(SAcct.addProvider)
+                Box(Modifier.padding(horizontal = 16.dp)) { OcTextField(query, { query = it }, placeholder = SAcct.searchProviders) }
                 Spacer(Modifier.height(12.dp))
             }
             if (loading) item { Box(Modifier.fillMaxWidth().padding(24.dp)) { Spinner(26.dp) } }
@@ -112,14 +114,14 @@ fun ProvidersScreen(nav: Nav) {
         ConnectSheet(p, onDone = { connect = null; scope.launch { load() } })
     }
     disconnect?.let { id ->
-        OcDialog("Disconnect $id?", { disconnect = null }, "Disconnect", {
+        OcDialog(SAcct.disconnectNamed(id), { disconnect = null }, SAcct.disconnect, {
             disconnect = null
             scope.launch {
                 if (id == com.cl0de.app.data.FreeModels.COPILOT_ID || id == com.cl0de.app.data.FreeModels.POLLINATIONS_ID) com.cl0de.app.data.FreeModels.disable(id)
                 else runCatching { Graph.api.removeAuth(id); Graph.api.disposeAll() }
                 Graph.catalog.refresh(); load()
             }
-        }, danger = true) { Txt("Stored credentials for this provider are removed from the phone.", size = 16.sp, color = Oc.c.textDim) }
+        }, danger = true) { Txt(SAcct.storedCredentialsRemoved, size = 16.sp, color = Oc.c.textDim) }
     }
 }
 
@@ -138,23 +140,23 @@ private fun ConnectSheet(p: AllProvider, onDone: () -> Unit) {
     var code by remember { mutableStateOf("") }
 
     LaunchedEffect(p.id) {
-        methods = runCatching { Graph.api.providerAuthMethods()[p.id] }.getOrNull().orEmpty().ifEmpty { listOf(AuthMethod("api", "API key")) }
+        methods = runCatching { Graph.api.providerAuthMethods()[p.id] }.getOrNull().orEmpty().ifEmpty { listOf(AuthMethod("api", SAcct.apiKey)) }
     }
 
-    fun finish() { scope.launch { runCatching { Graph.api.disposeAll() }; Graph.catalog.refresh(); Graph.chats.toasts.tryEmit("${p.name} connected"); onDone() } }
+    fun finish() { scope.launch { runCatching { Graph.api.disposeAll() }; Graph.catalog.refresh(); Graph.chats.toasts.tryEmit(SAcct.providerConnected(p.name)); onDone() } }
 
     OcSheet(onDone, p.name.ifBlank { p.id }, skipHalf = false) {
         Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             if (methods == null) Box(Modifier.fillMaxWidth().padding(24.dp)) { Spinner(26.dp) }
             methods?.forEachIndexed { i, m ->
                 if (m.type == "api") {
-                    Txt(m.label.ifBlank { "API key" }, size = 16.sp, color = c.textDim)
-                    OcTextField(key, { key = it }, placeholder = "Paste key", password = true, mono = true)
+                    Txt(m.label.ifBlank { SAcct.apiKey }, size = 16.sp, color = c.textDim)
+                    OcTextField(key, { key = it }, placeholder = SAcct.pasteKey, password = true, mono = true)
                     if (p.id == "opencode-go" || p.id == "opencode") {
-                        Txt("Get a key at opencode.ai/console (Go and Zen use the same console).", size = 14.sp, color = c.textDim)
-                        SmallButton("Open console", { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://opencode.ai/console")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) })
+                        Txt(SAcct.getKeyAtConsole, size = 14.sp, color = c.textDim)
+                        SmallButton(SAcct.openConsole, { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://opencode.ai/console")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) })
                     }
-                    Pill(if (busy) "Connecting…" else "Connect", {
+                    Pill(if (busy) SAcct.connecting else SAcct.connect, {
                         busy = true; error = null
                         scope.launch {
                             runCatching { Graph.api.setApiKey(p.id, key.trim()) }.onSuccess { finish() }.onFailure { error = it.message }
@@ -162,7 +164,7 @@ private fun ConnectSheet(p: AllProvider, onDone: () -> Unit) {
                         }
                     }, enabled = key.isNotBlank() && !busy, modifier = Modifier.fillMaxWidth())
                 } else {
-                    Pill(m.label.ifBlank { "Sign in" }, {
+                    Pill(m.label.ifBlank { SAcct.signIn }, {
                         busy = true; error = null
                         scope.launch {
                             runCatching { Graph.api.oauthAuthorize(p.id, i) }.onSuccess { r ->
@@ -181,8 +183,8 @@ private fun ConnectSheet(p: AllProvider, onDone: () -> Unit) {
             }
             oauthHint?.let { Txt(it, size = 15.sp, color = c.textDim) }
             if (oauthIndex != null && oauthMode == "code") {
-                OcTextField(code, { code = it }, placeholder = "Paste the code from the browser", mono = true)
-                Pill("Complete sign-in", {
+                OcTextField(code, { code = it }, placeholder = SAcct.pasteCodeFromBrowser, mono = true)
+                Pill(SAcct.completeSignIn, {
                     busy = true
                     scope.launch {
                         runCatching { Graph.api.oauthCallback(p.id, oauthIndex!!, code.trim()) }.onSuccess { finish() }.onFailure { error = it.message }

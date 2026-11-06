@@ -34,6 +34,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SAcct
 import com.cl0de.app.ui.components.tap
 import com.cl0de.app.api.Session
 import com.cl0de.app.ui.Nav
@@ -64,10 +66,10 @@ fun DrawerContent(nav: Nav, close: () -> Unit) {
             item {
                 val navs = if (Oc.look.id.kimiLike)
                     // Kimi: sections with labels like in their menu, plus memory
-                    listOf(Triple("Scheduled tasks", Ic.Clock2, Route.Scheduled), Triple("Remote devices", Ic.Laptop, Route.Code), Triple("Projects", Ic.Folder, Route.Projects), Triple("Artifacts", Ic.Puzzle, Route.Artifacts), Triple("Memory", Ic.Sparkle, Route.Memory)) +
+                    listOf(Triple(SAcct.scheduledTasks, Ic.Clock2, Route.Scheduled), Triple(SAcct.remoteDevices, Ic.Laptop, Route.Code), Triple(S.projects, Ic.Folder, Route.Projects), Triple(SAcct.artifacts, Ic.Puzzle, Route.Artifacts), Triple(SAcct.memory, Ic.Sparkle, Route.Memory)) +
                         // Cl0de has its own room: chat and play while the agent works
                         (if (Oc.look.id == "cloud") listOf(Triple("Cl0de", Ic.Cloud, Route.Mascot)) else emptyList())
-                else listOf(Triple("Projects", Ic.Folder, Route.Projects), Triple("Code", Ic.Code, Route.Code), Triple("Artifacts", Ic.Puzzle, Route.Artifacts), Triple("Scheduled", Ic.Clock2, Route.Scheduled))
+                else listOf(Triple(S.projects, Ic.Folder, Route.Projects), Triple(SAcct.codeTab, Ic.Code, Route.Code), Triple(SAcct.artifacts, Ic.Puzzle, Route.Artifacts), Triple(SAcct.scheduled, Ic.Clock2, Route.Scheduled))
                 if (Oc.look.id == "cards") {
                     // Cards: sections as 2×2 tiles
                     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -85,12 +87,12 @@ fun DrawerContent(nav: Nav, close: () -> Unit) {
                 if (Oc.look.id != "cards") Box(Modifier.padding(horizontal = 20.dp, vertical = 14.dp).fillMaxWidth().height(1.dp).background(c.border))
             }
             if (pinned.isNotEmpty()) {
-                item { Txt("Pinned", Modifier.padding(start = 24.dp, top = 6.dp, bottom = 6.dp), size = 16.sp, color = c.textDim) }
+                item { Txt(SAcct.pinned, Modifier.padding(start = 24.dp, top = 6.dp, bottom = 6.dp), size = 16.sp, color = c.textDim) }
                 items(pinned, key = { "p" + it.id }) { SessionRow(it, statuses[it.id], nav, close) }
             }
-            item { Txt(if (Oc.look.id.kimiLike) "Chat history" else "Recents", Modifier.padding(start = 24.dp, top = 14.dp, bottom = 6.dp), size = 16.sp, color = c.textDim) }
+            item { Txt(if (Oc.look.id.kimiLike) SAcct.chatHistory else SAcct.recents, Modifier.padding(start = 24.dp, top = 14.dp, bottom = 6.dp), size = 16.sp, color = c.textDim) }
             items(recent, key = { "r" + it.id }) { SessionRow(it, statuses[it.id], nav, close) }
-            if (recent.isEmpty() && pinned.isEmpty()) item { Txt("No sessions yet", Modifier.padding(start = 24.dp, top = 8.dp), size = 16.sp, color = c.textDim) }
+            if (recent.isEmpty() && pinned.isEmpty()) item { Txt(SAcct.noSessionsYet, Modifier.padding(start = 24.dp, top = 8.dp), size = 16.sp, color = c.textDim) }
         }
         Row(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding()
@@ -104,14 +106,14 @@ fun DrawerContent(nav: Nav, close: () -> Unit) {
                     Modifier.weight(1f).height(52.dp).clip(CircleShape).background(c.surfaceHigh.copy(alpha = 0.7f)).border(1.dp, c.border, CircleShape)
                         .tap(scale = 0.98f) { SearchHandoff.pending = true; go(Route.Recents) }.padding(horizontal = 18.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                ) { Ico(Ic.Search, tint = c.textDim, size = 22.dp); Spacer(Modifier.width(12.dp)); Txt("Search", size = 17.sp, color = c.textDim) }
+                ) { Ico(Ic.Search, tint = c.textDim, size = 22.dp); Spacer(Modifier.width(12.dp)); Txt(S.search, size = 17.sp, color = c.textDim) }
                 Spacer(Modifier.width(10.dp))
                 if (Oc.look.id == "cloud") com.cl0de.app.ui.components.KimiCircleBtn(Ic.Edit, { go(Route.Home) }, size = 52.dp)
                 else com.cl0de.app.ui.components.KimiCircleBtn(Ic.Sliders, { go(Route.Settings) }, size = 52.dp)
             } else {
             Avatar(52.dp) { go(Route.Settings) }
             Spacer(Modifier.weight(1f))
-            Pill("New chat", { go(Route.Home) }, icon = Ic.Plus)
+            Pill(S.newChat, { go(Route.Home) }, icon = Ic.Plus)
             }
         }
     }
@@ -141,7 +143,7 @@ private fun DrawerHeader(go: (Route) -> Unit) {
             }
             Spacer(Modifier.height(14.dp))
             Txt(Graph.prefs.userName.ifBlank { "OpenCode" }, size = 17.sp, weight = androidx.compose.ui.text.font.FontWeight.SemiBold)
-            Txt("OpenCode on this phone", size = 14.sp, color = c.textDim)
+            Txt(SAcct.openCodeOnThisPhone, size = 14.sp, color = c.textDim)
         }
         // Hairline: mono label, wide heading and a line
         "hairline" -> Column(Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp, top = 12.dp, bottom = 4.dp)) {
@@ -157,7 +159,7 @@ private fun DrawerHeader(go: (Route) -> Unit) {
             Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp).fillMaxWidth().height(44.dp).clip(CircleShape).background(c.surfaceHigh)
                 .tap(scale = 0.99f) { go(Route.Recents) }.padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
-        ) { Ico(Ic.Search, tint = c.textDim, size = 20.dp); Spacer(Modifier.width(10.dp)); Txt("Search", size = 16.sp, color = c.textDim) }
+        ) { Ico(Ic.Search, tint = c.textDim, size = 20.dp); Spacer(Modifier.width(10.dp)); Txt(S.search, size = 16.sp, color = c.textDim) }
         // Kimi: a plain heading without the mascot (the mascot is only on the empty screen and while thinking)
         // Kimi: avatar, name and a round new chat button
         "kimi", "cloud" -> Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp, top = 14.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {

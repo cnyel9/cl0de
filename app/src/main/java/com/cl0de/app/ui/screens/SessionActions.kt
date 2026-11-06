@@ -14,6 +14,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
 import com.cl0de.app.api.Session
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SChat
 import com.cl0de.app.ui.components.ChoiceRow
 import com.cl0de.app.ui.components.OcDialog
 import com.cl0de.app.ui.components.OcSheet
@@ -34,28 +36,28 @@ fun SessionActionsSheet(s: Session, onDismiss: () -> Unit) {
 
     if (rename) {
         var t by remember { mutableStateOf(s.title) }
-        OcDialog("Rename session", onDismiss, "Save", {
+        OcDialog(SChat.renameSession, onDismiss, S.save, {
             scope.launch { runCatching { Graph.api.renameSession(s.id, dir, t) }; Graph.chats.refreshSessions() }
             onDismiss()
         }) { OcTextField(t, { t = it }) }
         return
     }
     if (delete) {
-        OcDialog("Delete session?", onDismiss, "Delete", {
+        OcDialog(SChat.deleteSessionQ, onDismiss, S.delete, {
             scope.launch { runCatching { Graph.api.deleteSession(s.id, dir) }; Graph.chats.forget(s.id); Graph.chats.refreshSessions() }
             onDismiss()
-        }, danger = true) { Txt("This permanently removes the conversation and its history.", size = 16.sp, color = Oc.c.textDim) }
+        }, danger = true) { Txt(SChat.deleteSessionBody, size = 16.sp, color = Oc.c.textDim) }
         return
     }
     OcSheet(onDismiss, title = s.displayTitle.take(40)) {
         Column(Modifier.padding(bottom = 12.dp)) {
-            ChoiceRow(if (pinned) "Unpin" else "Pin", false, { Graph.prefs.togglePin(s.id); onDismiss() }, icon = Ic.Pin)
-            ChoiceRow("Rename", false, { rename = true }, icon = Ic.Edit)
-            ChoiceRow("Archive", false, {
+            ChoiceRow(if (pinned) SChat.unpin else SChat.pin, false, { Graph.prefs.togglePin(s.id); onDismiss() }, icon = Ic.Pin)
+            ChoiceRow(S.rename, false, { rename = true }, icon = Ic.Edit)
+            ChoiceRow(SChat.archive, false, {
                 scope.launch { runCatching { Graph.api.archiveSession(s.id, dir) }; Graph.chats.refreshSessions() }
                 onDismiss()
             }, icon = Ic.Archive)
-            ChoiceRow("Delete", false, { delete = true }, icon = Ic.Trash)
+            ChoiceRow(S.delete, false, { delete = true }, icon = Ic.Trash)
         }
     }
 }

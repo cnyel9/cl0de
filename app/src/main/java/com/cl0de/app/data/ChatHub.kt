@@ -370,10 +370,10 @@ class ChatHub(private val api: OpenCodeApi, private val events: EventHub, privat
                 val text = last.parts.filter { it.type == "text" && it.raw.str("synthetic") != "true" }.joinToString("\n") { it.text }
                 if (text.isBlank()) return@launch
                 FreeModels.enablePollinations()
-                toasts.tryEmit("Zen is capped — switched to GPT-OSS 20B (Pollinations)")
+                toasts.tryEmit(SMisc.zenCapped)
                 edit(Graph.app, id, last, text, emptyList())
             } catch (e: Exception) {
-                toasts.tryEmit(e.message ?: "Could not switch the model")
+                toasts.tryEmit(e.message ?: SMisc.couldNotSwitchModel)
             } finally { switching = false }
         }
     }

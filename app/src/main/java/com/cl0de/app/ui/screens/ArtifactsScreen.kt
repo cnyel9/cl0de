@@ -39,6 +39,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SAcct
 import com.cl0de.app.api.long
 import com.cl0de.app.api.str
 import com.cl0de.app.ui.Nav
@@ -85,20 +87,20 @@ fun ArtifactsScreen(nav: Nav, onMenu: () -> Unit) {
     val list = items?.filter { query.isBlank() || it.file.contains(query, true) || it.sessionTitle.contains(query, true) }
 
     Column(Modifier.fillMaxSize().screenBackdrop("ArtifactsScreen1")) {
-        TopBar("Artifacts", left = { IconBtn(Ic.Menu, onMenu) })
+        TopBar(SAcct.artifacts, left = { IconBtn(Ic.Menu, onMenu) })
         Row(
             Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(Oc.round(30.dp)).border(1.5.dp, c.border, Oc.round(30.dp)).padding(horizontal = 20.dp, vertical = 18.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Ico(Ic.Search, tint = c.textDim, size = 26.dp); Spacer(Modifier.width(16.dp))
             Box(Modifier.weight(1f)) {
-                if (query.isEmpty()) Txt("Search artifacts", size = 19.sp, color = c.textDim)
+                if (query.isEmpty()) Txt(SAcct.searchArtifacts, size = 19.sp, color = c.textDim)
                 BasicTextField(query, { query = it }, singleLine = true, textStyle = TextStyle(color = c.text, fontSize = 19.sp), cursorBrush = SolidColor(c.text), modifier = Modifier.fillMaxWidth())
             }
         }
         when {
             list == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Spinner(32.dp) }
-            list.isEmpty() -> EmptyState(Ic.Puzzle, "No artifacts yet", "Files that OpenCode creates in your sessions will show up here.", Modifier.padding(top = 80.dp))
+            list.isEmpty() -> EmptyState(Ic.Puzzle, SAcct.noArtifactsYet, SAcct.artifactsShowHere, Modifier.padding(top = 80.dp))
             else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(list, key = { it.file + it.sessionTitle }) { a ->
                     Row(
@@ -118,7 +120,7 @@ fun ArtifactsScreen(nav: Nav, onMenu: () -> Unit) {
                                 Txt(a.sessionTitle, size = 16.sp, color = c.textDim, maxLines = 1)
                             }
                             Spacer(Modifier.height(4.dp))
-                            Txt("Edited ${ago(a.updated)} · +${a.adds} −${a.dels}", size = 15.sp, color = c.textDim, maxLines = 1)
+                            Txt(SAcct.editedLine(ago(a.updated), a.adds, a.dels), size = 15.sp, color = c.textDim, maxLines = 1)
                         }
                     }
                 }
@@ -132,7 +134,7 @@ fun ArtifactsScreen(nav: Nav, onMenu: () -> Unit) {
                 Txt(a.file, size = 14.sp, color = Oc.c.textDim)
                 a.content?.let { CodeBlock(it, a.file.substringAfterLast('.', "")) }
                 if (a.content == null) a.patch?.let { DiffView(it) }
-                a.content?.let { Row { com.cl0de.app.ui.components.SmallButton("Copy", { clip.setText(AnnotatedString(it)); Graph.chats.toasts.tryEmit("Copied") }) } }
+                a.content?.let { Row { com.cl0de.app.ui.components.SmallButton(S.copy, { clip.setText(AnnotatedString(it)); Graph.chats.toasts.tryEmit(S.copied) }) } }
             }
         }
     }

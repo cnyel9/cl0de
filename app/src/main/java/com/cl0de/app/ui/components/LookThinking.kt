@@ -45,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cl0de.app.data.SChat
 import com.cl0de.app.ui.theme.Oc
 import kotlinx.coroutines.delay
 import kotlin.math.PI
@@ -86,9 +87,9 @@ private fun elapsed(): Long {
 private fun mmss(s: Long) = "%d:%02d".format(s / 60, s % 60)
 
 private val Work.verb get() = when (this) {
-    Work.Think -> "thinking"; Work.Read -> "reading files"; Work.Write -> "typing"; Work.Edit -> "editing code"
-    Work.Run -> "running a command"; Work.Search -> "searching"; Work.Web -> "browsing the web"; Work.Plan -> "planning"
-    Work.Wait -> "waiting for the provider"; Work.Other -> "working"
+    Work.Think -> SChat.verbThinking; Work.Read -> SChat.verbReadingFiles; Work.Write -> SChat.verbTyping; Work.Edit -> SChat.verbEditingCode
+    Work.Run -> SChat.verbRunningCommand; Work.Search -> SChat.verbSearching; Work.Web -> SChat.verbBrowsingWeb; Work.Plan -> SChat.verbPlanning
+    Work.Wait -> SChat.verbWaitingProvider; Work.Other -> SChat.verbWorking
 }
 
 // ---------- Terminal ----------
@@ -103,8 +104,8 @@ private fun TerminalThinking(work: Work, modifier: Modifier) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         Txt(frames[f.toInt().coerceIn(0, frames.length - 1)].toString(), size = 15.sp, color = c.accent, family = Oc.mono)
         Spacer(Modifier.width(10.dp))
-        Txt(work.label, size = 15.sp, family = Oc.mono)
-        Txt("  ${s}s · stop to interrupt", size = 13.sp, color = c.textDim, family = Oc.mono, maxLines = 1)
+        Txt(work.displayLabel(), size = 15.sp, family = Oc.mono)
+        Txt(SChat.elapsedStop(s), size = 13.sp, color = c.textDim, family = Oc.mono, maxLines = 1)
     }
 }
 
@@ -120,7 +121,7 @@ private fun HairlineThinking(work: Work, modifier: Modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(6.dp).background(c.accent))
             Spacer(Modifier.width(10.dp))
-            Txt(work.label.uppercase(), size = 11.sp, family = Oc.label)
+            Txt(work.displayLabel().uppercase(), size = 11.sp, family = Oc.label)
             Spacer(Modifier.width(10.dp))
             Txt(mmss(s), size = 11.sp, color = c.textDim, family = Oc.label)
         }
@@ -138,7 +139,7 @@ private fun HairlineThinking(work: Work, modifier: Modifier) {
 @Composable
 private fun NotebookThinking(work: Work, modifier: Modifier) {
     val c = Oc.c
-    val text = work.label + "…"
+    val text = work.displayLabel() + "…"
     val t = rememberInfiniteTransition(label = "ink")
     // 0..0.7 write letter by letter, 0.7..1 hold; the caret blinks
     val ph by t.animateFloat(0f, 1f, infiniteRepeatable(tween(2600, easing = LinearEasing)), label = "ph")
@@ -185,7 +186,7 @@ private fun MessengerThinking(work: Work, modifier: Modifier) {
             }
         }
         Spacer(Modifier.width(10.dp))
-        Txt("OpenCode is ${work.verb}…", Modifier.padding(bottom = 10.dp), size = 13.sp, color = c.link)
+        Txt(SChat.opencodeIs(work.verb), Modifier.padding(bottom = 10.dp), size = 13.sp, color = c.link)
     }
 }
 
@@ -217,7 +218,7 @@ private fun CardsThinking(work: Work, modifier: Modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(6.dp).graphicsLayer { alpha = pulse }.clip(CircleShape).background(c.link))
             Spacer(Modifier.width(8.dp))
-            Txt(work.label, Modifier.weight(1f), size = 13.sp, color = c.textDim, weight = FontWeight.Medium)
+            Txt(work.displayLabel(), Modifier.weight(1f), size = 13.sp, color = c.textDim, weight = FontWeight.Medium)
             Txt("${s}s", size = 12.sp, color = c.textDim)
         }
         Spacer(Modifier.height(12.dp))
@@ -251,7 +252,7 @@ private fun ChatGptThinking(work: Work, modifier: Modifier) {
             Spacer(Modifier.width(12.dp))
             val w = 240f
             Text(
-                work.label,
+                work.displayLabel(),
                 style = TextStyle(
                     fontSize = 15.sp, fontFamily = Oc.body,
                     brush = Brush.linearGradient(0f to c.textDim, 0.5f to c.text, 1f to c.textDim, start = Offset(x * w - w / 2, 0f), end = Offset(x * w + w / 2, 0f)),
@@ -272,7 +273,7 @@ private fun KimiThinking(work: Work, modifier: Modifier) {
         KimiMascot(Modifier.size(28.dp), c.accent, thinking = true)
         Spacer(Modifier.width(10.dp))
         Box(Modifier.clip(CircleShape).background(c.surfaceHigh).padding(horizontal = 14.dp, vertical = 7.dp)) {
-            Txt(work.label + ".".repeat(dots.toInt().coerceAtMost(3)), size = 14.sp, color = c.textDim)
+            Txt(work.displayLabel() + ".".repeat(dots.toInt().coerceAtMost(3)), size = 14.sp, color = c.textDim)
         }
     }
 }

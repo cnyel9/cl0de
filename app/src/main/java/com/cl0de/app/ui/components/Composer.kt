@@ -60,6 +60,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import com.cl0de.app.Graph
 import com.cl0de.app.data.Attachment
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SChat
 import com.cl0de.app.data.Attachments
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.Route
@@ -114,7 +116,7 @@ fun ComposerHost(
     onSend: () -> Unit,
     onStop: () -> Unit,
     sessionId: String? = null,
-    placeholder: String = "Chat with OpenCode…",
+    placeholder: String = SChat.chatWithOpenCode,
     dashed: Boolean = false,
     modifier: Modifier = Modifier,
     onVoice: (() -> Unit)? = null,
@@ -147,13 +149,17 @@ fun ComposerHost(
     }
 
     val model = providers.firstOrNull { it.id == prefs.providerId }?.models?.get(prefs.modelId)
-    val modelName = model?.name?.takeIf { it.isNotBlank() } ?: prefs.modelId.ifBlank { "Select model" }
+    val modelName = model?.name?.takeIf { it.isNotBlank() } ?: prefs.modelId.ifBlank { SChat.selectModel }
     val (dict, startDict) = rememberDictation()
     // the mascot on home listens while dictation runs
     androidx.compose.runtime.LaunchedEffect(dict.active) { MascotSignals.listening = dict.active }
     androidx.compose.runtime.LaunchedEffect(dict.active) { while (dict.active) { MascotSignals.level = dict.levels.lastOrNull() ?: 0f; kotlinx.coroutines.delay(80) } }
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { MascotSignals.listening = false } }
     fun takeDictation() { val t = dict.finish(); if (t.isNotBlank()) state.text = if (state.text.isBlank()) t else state.text.trimEnd() + " " + t }
+    // Offline dictation delivers its transcript asynchronously once Whisper finishes decoding.
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        dict.onTranscribed = { t -> if (t.isNotBlank()) state.text = if (state.text.isBlank()) t else state.text.trimEnd() + " " + t }
+    }
     // ChatGPT and Kimi: a one-line input, the model in the top bar
     val compact = Oc.look.compact
     val look = Oc.look.id
@@ -219,7 +225,7 @@ fun ComposerHost(
         Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(top = 14.dp, bottom = 2.dp).heightIn(min = 26.dp, max = 200.dp)) {
             if (dict.active) {
                 // what's been said goes right into the input, like in Claude
-                Txt(listOf(state.text, dict.text).filter { it.isNotBlank() }.joinToString(" ").ifBlank { "Listening…" }, size = 17.sp, color = if (dict.text.isBlank()) c.textDim else c.text, maxLines = 8)
+                Txt(listOf(state.text, dict.text).filter { it.isNotBlank() }.joinToString(" ").ifBlank { SChat.listening }, size = 17.sp, color = if (dict.text.isBlank()) c.textDim else c.text, maxLines = 8)
             } else {
             if (state.text.isEmpty()) when (look) {
                 "hairline" -> Txt(placeholder.uppercase().removeSuffix("…") + " _", size = 13.sp, color = c.textDim, family = Oc.label, modifier = Modifier.padding(top = 2.dp))
@@ -372,11 +378,11 @@ private fun AddSheet(
     val scope = rememberCoroutineScope()
     var page by remember { mutableStateOf("main") }
     val agents by Graph.catalog.agents.collectAsState()
-    val permLabel = mapOf("ask" to "Ask", "edits" to "Auto-edit", "auto" to "Auto")
+    val permLabel = mapOf("ask" to SChat.askLabel, "edits" to SChat.autoEditLabel, "auto" to SChat.autoLabel)
 
     PickerFrame(
         onDismiss = onDismiss,
-        title = when (page) { "perm" -> "Permission"; "agent" -> "Agent"; else -> if (Oc.terminal) "Commands" else "Add to session" },
+        title = when (page) { "perm" -> SChat.permissionSingular; "agent" -> SChat.agentLabel; else -> if (Oc.terminal) SChat.commandsTitle else SChat.addToSession },
         onBack = if (page != "main") ({ page = "main" }) else null,
         skipHalf = !Oc.claudeLike,
     ) {
@@ -384,9 +390,9 @@ private fun AddSheet(
             when (page) {
                 "perm" -> {
                     listOf(
-                        Triple("ask", "Ask", "Confirm every file edit and command"),
-                        Triple("edits", "Auto-edit", "Edit files freely, ask before commands and web"),
-                        Triple("auto", "Auto", "Run everything without asking"),
+                        Triple("ask", SChat.askLabel, SChat.confirmEvery),
+                        Triple("edits", SChat.autoEditLabel, SChat.editFreelyAsk),
+                        Triple("auto", SChat.autoLabel, SChat.runEverything),
                     ).forEach { (k, l, d) ->
                         PickRow(l, {
                             prefs.permissionMode = k
@@ -405,39 +411,39 @@ private fun AddSheet(
                 }
                 else -> if (Oc.claudeLike) {
                     Row(Modifier.padding(horizontal = 16.dp).padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Tile("Camera", Ic.Camera, Modifier.weight(1f), onCamera)
-                        Tile("Photos", Ic.Image, Modifier.weight(1f), onPhotos)
-                        Tile("Files", Ic.FileUp, Modifier.weight(1f), onFiles)
+                        Tile(SChat.camera, Ic.Camera, Modifier.weight(1f), onCamera)
+                        Tile(SChat.photos, Ic.Image, Modifier.weight(1f), onPhotos)
+                        Tile(SChat.filesLabel, Ic.FileUp, Modifier.weight(1f), onFiles)
                     }
                     Spacer(Modifier.height(14.dp))
                     SettingsGroup {
-                        SettingsRow("Permission", subtitle = permLabel[prefs.permissionMode], icon = Ic.FastForward, circleIcon = true, chevron = true, onClick = { page = "perm" })
-                        SettingsRow("Agent", subtitle = prefs.agent.replaceFirstChar { it.uppercase() }, icon = Ic.Bot, circleIcon = true, chevron = true, onClick = { page = "agent" })
-                        SettingsRow("Devices", icon = Ic.Laptop, circleIcon = true, chevron = true, onClick = { onDismiss(); nav.push(Route.Code) })
+                        SettingsRow(SChat.permissionSingular, subtitle = permLabel[prefs.permissionMode], icon = Ic.FastForward, circleIcon = true, chevron = true, onClick = { page = "perm" })
+                        SettingsRow(SChat.agentLabel, subtitle = prefs.agent.replaceFirstChar { it.uppercase() }, icon = Ic.Bot, circleIcon = true, chevron = true, onClick = { page = "agent" })
+                        SettingsRow(SChat.devices, icon = Ic.Laptop, circleIcon = true, chevron = true, onClick = { onDismiss(); nav.push(Route.Code) })
                     }
                     Spacer(Modifier.height(14.dp))
                     SettingsGroup {
-                        SettingsRow("Plan mode", icon = Ic.ListCheck, circleIcon = true, trailing = {
+                        SettingsRow(SChat.planMode, icon = Ic.ListCheck, circleIcon = true, trailing = {
                             OcSwitch(prefs.agent == "plan") { prefs.agent = if (it) "plan" else "build" }
                         })
-                        SettingsRow("Connectors", icon = Ic.Puzzle, circleIcon = true, chevron = true, onClick = { onDismiss(); nav.push(Route.Connectors) })
+                        SettingsRow(SChat.connectors, icon = Ic.Puzzle, circleIcon = true, chevron = true, onClick = { onDismiss(); nav.push(Route.Connectors) })
                         SettingsRow("Skills", icon = Ic.Scroll, circleIcon = true, chevron = true, onClick = { onDismiss(); nav.push(Route.Skills) })
-                        SettingsRow("Memory", icon = Ic.Scroll, circleIcon = true, trailing = {
+                        SettingsRow(SChat.memoryLabel, icon = Ic.Scroll, circleIcon = true, trailing = {
                             OcSwitch(prefs.memoryEnabled) { prefs.memoryEnabled = it; com.cl0de.app.data.Memory.sync() }
                         })
                     }
                 } else {
                     // Terminal: a command list with hints on the right; Desktop: a compact menu with icons
                     val t = Oc.terminal
-                    PickRow(if (t) "Attach photo" else "Camera", onCamera, icon = Ic.Camera, trailing = if (t) "camera" else null)
-                    PickRow(if (t) "Attach image" else "Photos", onPhotos, icon = Ic.Image, trailing = if (t) "photos" else null)
-                    PickRow(if (t) "Attach file" else "Files", onFiles, icon = Ic.FileUp, trailing = if (t) "@" else null)
+                    PickRow(if (t) SChat.attachPhoto else SChat.camera, onCamera, icon = Ic.Camera, trailing = if (t) "camera" else null)
+                    PickRow(if (t) SChat.attachImage else SChat.photos, onPhotos, icon = Ic.Image, trailing = if (t) "photos" else null)
+                    PickRow(if (t) SChat.attachFile else SChat.filesLabel, onFiles, icon = Ic.FileUp, trailing = if (t) "@" else null)
                     if (!t) Box(Modifier.padding(horizontal = 16.dp, vertical = 6.dp).fillMaxWidth().height(1.dp).background(c.border))
-                    PickRow(if (t) "Switch permission" else "Permission", { page = "perm" }, icon = Ic.Shield, trailing = permLabel[prefs.permissionMode], chevron = !t)
-                    PickRow(if (t) "Switch agent" else "Agent", { page = "agent" }, icon = Ic.Bot, trailing = if (t) "tab · " + prefs.agent else prefs.agent.replaceFirstChar { it.uppercase() }, chevron = !t)
-                    PickRow(if (t) "Toggle plan mode" else "Plan mode", { prefs.agent = if (prefs.agent == "plan") "build" else "plan" }, icon = Ic.ListCheck, selected = !t && prefs.agent == "plan", trailing = if (t) (if (prefs.agent == "plan") "on" else "off") else null)
+                    PickRow(if (t) SChat.switchPermission else SChat.permissionSingular, { page = "perm" }, icon = Ic.Shield, trailing = permLabel[prefs.permissionMode], chevron = !t)
+                    PickRow(if (t) SChat.switchAgent else SChat.agentLabel, { page = "agent" }, icon = Ic.Bot, trailing = if (t) "tab · " + prefs.agent else prefs.agent.replaceFirstChar { it.uppercase() }, chevron = !t)
+                    PickRow(if (t) SChat.togglePlanMode else SChat.planMode, { prefs.agent = if (prefs.agent == "plan") "build" else "plan" }, icon = Ic.ListCheck, selected = !t && prefs.agent == "plan", trailing = if (t) (if (prefs.agent == "plan") SChat.onLower else SChat.offLower) else null)
                     if (!t) Box(Modifier.padding(horizontal = 16.dp, vertical = 6.dp).fillMaxWidth().height(1.dp).background(c.border))
-                    PickRow(if (t) "Connectors (MCP)" else "Connectors", { onDismiss(); nav.push(Route.Connectors) }, icon = Ic.Puzzle, chevron = !t)
+                    PickRow(if (t) SChat.connectorsMcp else SChat.connectors, { onDismiss(); nav.push(Route.Connectors) }, icon = Ic.Puzzle, chevron = !t)
                     PickRow("Skills", { onDismiss(); nav.push(Route.Skills) }, icon = Ic.Scroll, chevron = !t)
                 }
             }
@@ -469,18 +475,18 @@ fun ModelSheet(start: String = "main", onDismiss: () -> Unit) {
 
     PickerFrame(
         onDismiss = onDismiss,
-        title = when (page) { "effort" -> "Effort"; "all" -> "More models"; else -> "Select model" },
+        title = when (page) { "effort" -> SChat.effortLabel; "all" -> SChat.moreModels; else -> SChat.selectModel },
         onBack = if (page != "main") ({ page = "main" }) else null,
         skipHalf = false,
     ) {
         if (page == "effort") {
             val names = current?.variantNames.orEmpty()
             Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
-                PickRow("Default", { prefs.variant = ""; page = "main" }, selected = prefs.variant.isBlank())
+                PickRow(SChat.defaultLabel, { prefs.variant = ""; page = "main" }, selected = prefs.variant.isBlank())
                 names.forEach { n ->
-                    PickRow(n.replaceFirstChar { it.uppercase() }, { prefs.variant = n; page = "main" }, selected = prefs.variant == n, badge = if (n == "medium") "Recommended" else null)
+                    PickRow(n.replaceFirstChar { it.uppercase() }, { prefs.variant = n; page = "main" }, selected = prefs.variant == n, badge = if (n == "medium") SChat.recommended else null)
                 }
-                Txt("Higher effort means more thorough responses, but takes longer and uses your limits faster.", size = 15.sp, color = c.textDim, modifier = Modifier.padding(24.dp))
+                Txt(SChat.effortExplain, size = 15.sp, color = c.textDim, modifier = Modifier.padding(24.dp))
             }
             return@PickerFrame
         }
@@ -489,10 +495,10 @@ fun ModelSheet(start: String = "main", onDismiss: () -> Unit) {
             ClaudeModelMain(current, onDismiss = onDismiss, onEffort = { page = "effort" }, onMore = { page = "all" })
             return@PickerFrame
         }
-        PickSearch(query, { query = it }, "Search models")
+        PickSearch(query, { query = it }, SChat.searchModels)
         LazyColumn(Modifier.heightIn(max = 520.dp).padding(bottom = if (claudeEd) 24.dp else 8.dp)) {
             if (!claudeEd && current != null && current.variantNames.isNotEmpty()) item {
-                PickRow("Effort", { page = "effort" }, trailing = prefs.variant.ifBlank { "Default" }.replaceFirstChar { it.uppercase() }, chevron = true)
+                PickRow(SChat.effortLabel, { page = "effort" }, trailing = prefs.variant.ifBlank { SChat.defaultLabel }.replaceFirstChar { it.uppercase() }, chevron = true)
             }
             providers.forEach { p ->
                 val ms = p.models.values.filter { query.isBlank() || it.name.contains(query, true) || it.id.contains(query, true) }
@@ -502,9 +508,9 @@ fun ModelSheet(start: String = "main", onDismiss: () -> Unit) {
                     items(ms, key = { p.id + "/" + it.id }) { m ->
                         val sel = prefs.providerId == p.id && prefs.modelId == m.id
                         val meta = buildList {
-                            m.limit?.context?.takeIf { it > 0 }?.let { add("${it / 1000}k ctx") }
-                            if (m.supportsImages) add("images")
-                            if (m.reasoning) add("reasoning")
+                            m.limit?.context?.takeIf { it > 0 }?.let { add(SChat.ctxShort(it)) }
+                            if (m.supportsImages) add(SChat.imagesWord)
+                            if (m.reasoning) add(SChat.reasoningWord)
                         }.joinToString(" · ")
                         PickRow(m.name.ifBlank { m.id }, {
                             pickModel(p.id, m)
@@ -513,11 +519,11 @@ fun ModelSheet(start: String = "main", onDismiss: () -> Unit) {
                     }
                 }
             }
-            if (providers.isEmpty()) item { Txt("No connected providers yet. Connect one in Settings → Providers.", color = c.textDim, modifier = Modifier.padding(24.dp)) }
+            if (providers.isEmpty()) item { Txt(SChat.noProvidersConnect, color = c.textDim, modifier = Modifier.padding(24.dp)) }
             if (claudeEd && current != null && current.variantNames.isNotEmpty()) item {
                 Box(Modifier.padding(16.dp)) {
                     SettingsGroup {
-                        SettingsRow("Effort", subtitle = prefs.variant.ifBlank { "Default" }.replaceFirstChar { it.uppercase() }, chevron = true, onClick = { page = "effort" })
+                        SettingsRow(SChat.effortLabel, subtitle = prefs.variant.ifBlank { SChat.defaultLabel }.replaceFirstChar { it.uppercase() }, chevron = true, onClick = { page = "effort" })
                     }
                 }
             }
@@ -556,14 +562,14 @@ private fun ClaudeModelMain(current: com.cl0de.app.api.ModelInfo?, onDismiss: ()
     }
     Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
         if (featured.isEmpty()) {
-            Txt("No connected providers yet. Connect one in Settings → Providers.", color = c.textDim, modifier = Modifier.padding(24.dp))
+            Txt(SChat.noProvidersConnect, color = c.textDim, modifier = Modifier.padding(24.dp))
         } else SettingsGroup {
             featured.forEach { (pid, m) ->
                 val sel = prefs.providerId == pid && prefs.modelId == m.id
                 val meta = buildList {
-                    m.limit?.context?.takeIf { it > 0 }?.let { add("${it / 1000}k context") }
-                    if (m.supportsImages) add("images")
-                    if (m.reasoning) add("reasoning")
+                    m.limit?.context?.takeIf { it > 0 }?.let { add(SChat.ctxFull(it)) }
+                    if (m.supportsImages) add(SChat.imagesWord)
+                    if (m.reasoning) add(SChat.reasoningWord)
                 }.joinToString(" · ")
                 Row(
                     Modifier.fillMaxWidth().background(c.surface).tap(scale = 1f) {
@@ -582,22 +588,22 @@ private fun ClaudeModelMain(current: com.cl0de.app.api.ModelInfo?, onDismiss: ()
                 }
             }
         }
-        Txt("Free models share one daily limit per network. Connect more providers in Settings → Providers.", size = 15.sp, color = c.textDim, lineHeight = 21.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp))
+        Txt(SChat.freeModelsShare, size = 15.sp, color = c.textDim, lineHeight = 21.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp))
         if (current != null && current.variantNames.isNotEmpty()) {
             Box(Modifier.padding(bottom = 14.dp)) {
                 SettingsGroup {
                     Row(Modifier.fillMaxWidth().background(c.surface).tap(scale = 1f, onClick = onEffort).padding(horizontal = 18.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Txt("Effort", size = 19.sp)
-                        if (prefs.variant == "medium" || prefs.variant.isBlank()) { Spacer(Modifier.width(10.dp)); Chip("Recommended") }
+                        Txt(SChat.effortLabel, size = 19.sp)
+                        if (prefs.variant == "medium" || prefs.variant.isBlank()) { Spacer(Modifier.width(10.dp)); Chip(SChat.recommended) }
                         Spacer(Modifier.weight(1f))
-                        Txt(prefs.variant.ifBlank { "Default" }.replaceFirstChar { it.uppercase() }, size = 18.sp, color = c.textDim)
+                        Txt(prefs.variant.ifBlank { SChat.defaultLabel }.replaceFirstChar { it.uppercase() }, size = 18.sp, color = c.textDim)
                         Spacer(Modifier.width(6.dp)); Ico(Ic.ChevronRight, tint = c.textDim, size = 22.dp)
                     }
                 }
             }
         }
         SettingsGroup {
-            SettingsRow("More models", chevron = true, onClick = onMore)
+            SettingsRow(SChat.moreModels, chevron = true, onClick = onMore)
         }
     }
 }
@@ -610,7 +616,7 @@ fun TopModelPill(state: ComposerState) {
     val c = Oc.c
     val providers by Graph.catalog.providers.collectAsState()
     val prefs = Graph.prefs
-    val name = providers.firstOrNull { it.id == prefs.providerId }?.models?.get(prefs.modelId)?.name?.takeIf { it.isNotBlank() } ?: prefs.modelId.ifBlank { "Model" }
+    val name = providers.firstOrNull { it.id == prefs.providerId }?.models?.get(prefs.modelId)?.name?.takeIf { it.isNotBlank() } ?: prefs.modelId.ifBlank { S.model }
     Row(
         Modifier.padding(start = 6.dp).height(36.dp).widthIn(max = 200.dp).clip(CircleShape).background(c.surfaceHigh).tap(scale = 0.97f) { state.showModel = true }.padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,

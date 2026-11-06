@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SChat
 import com.cl0de.app.ui.theme.Oc
 
 /**
@@ -77,11 +79,11 @@ fun SelectionBarHost(bar: ChatTextToolbar, onReply: (String) -> Unit, onRead: (S
             @Composable fun item(label: String, onClick: () -> Unit) {
                 Box(Modifier.tap(scale = 1f, onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp)) { Txt(label, size = 15.sp) }
             }
-            bar.copy?.let { cp -> item("Copy") { cp(); bar.hide(); com.cl0de.app.Graph.chats.toasts.tryEmit("Copied") } }
-            bar.selectAll?.let { sa -> item("Select all") { sa() } }
+            bar.copy?.let { cp -> item(S.copy) { cp(); bar.hide(); com.cl0de.app.Graph.chats.toasts.tryEmit(S.copied) } }
+            bar.selectAll?.let { sa -> item(SChat.selectAll) { sa() } }
             if (bar.copy != null) {
-                item("Reply") { selected(onReply) }
-                item("Read aloud") { selected(onRead) }
+                item(SChat.replyAction) { selected(onReply) }
+                item(SChat.readAloud) { selected(onRead) }
             }
         }
     }

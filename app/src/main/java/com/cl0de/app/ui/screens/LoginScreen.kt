@@ -54,6 +54,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.cl0de.app.Graph
+import com.cl0de.app.data.SAcct
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.Route
 import com.cl0de.app.ui.components.Ico
@@ -93,10 +94,10 @@ fun LoginScreen(nav: Nav) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
             PixelWordmark(Modifier.padding(horizontal = 12.dp))
             Spacer(Modifier.height(32.dp))
-            Rise(shown, 1) { Heading("Code and chat, right on your phone", size = 28.sp, align = TextAlign.Center) }
+            Rise(shown, 1) { Heading(SAcct.codeAndChatOnPhone, size = 28.sp, align = TextAlign.Center) }
             Spacer(Modifier.height(12.dp))
             Rise(shown, 2) {
-                Txt("Free models work without an account. Sign in to add more models — your keys and memory stay on this phone.", size = 16.sp, color = c.textDim, align = TextAlign.Center, lineHeight = 23.sp)
+                Txt(SAcct.freeModelsNoAccount, size = 16.sp, color = c.textDim, align = TextAlign.Center, lineHeight = 23.sp)
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -104,17 +105,17 @@ fun LoginScreen(nav: Nav) {
                 Box(
                     Modifier.fillMaxWidth().height(56.dp).clip(Oc.pill).background(c.text).tap(onClick = { leave() }),
                     contentAlignment = Alignment.Center,
-                ) { Txt("Start without an account", size = 17.sp, color = c.bg, weight = FontWeight.Medium) }
+                ) { Txt(SAcct.startWithoutAccount, size = 17.sp, color = c.bg, weight = FontWeight.Medium) }
             }
             freeProviders.filter { it.id == "github-copilot" }.forEachIndexed { i, p ->
                 Rise(shown, 4 + i) {
-                    ProviderButton("Continue with ${p.title}", p.note, when (p.id) { "github-copilot" -> Brand.GitHub; else -> Brand.Key }) { nav.push(Route.Connect(p.id)) }
+                    ProviderButton(SAcct.continueWith(p.title), p.note, when (p.id) { "github-copilot" -> Brand.GitHub; else -> Brand.Key }) { nav.push(Route.Connect(p.id)) }
                 }
             }
         }
         Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 12.dp), horizontalArrangement = Arrangement.Center) {
-            Box(Modifier.clip(CircleShape).clickable { nav.push(Route.ConsoleLogin("")) }.padding(horizontal = 14.dp, vertical = 12.dp)) { Txt("OpenCode account", size = 15.sp, color = c.textDim) }
-            Box(Modifier.clip(CircleShape).clickable { nav.push(Route.Providers) }.padding(horizontal = 14.dp, vertical = 12.dp)) { Txt("Other providers", size = 15.sp, color = c.textDim) }
+            Box(Modifier.clip(CircleShape).clickable { nav.push(Route.ConsoleLogin("")) }.padding(horizontal = 14.dp, vertical = 12.dp)) { Txt(SAcct.openCodeAccount, size = 15.sp, color = c.textDim) }
+            Box(Modifier.clip(CircleShape).clickable { nav.push(Route.Providers) }.padding(horizontal = 14.dp, vertical = 12.dp)) { Txt(SAcct.otherProviders, size = 15.sp, color = c.textDim) }
         }
     }
 }

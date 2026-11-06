@@ -25,6 +25,8 @@ import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
 import com.cl0de.app.api.str
 import com.cl0de.app.data.ChatMessage
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SChat
 import com.cl0de.app.ui.components.OcSheet
 import com.cl0de.app.ui.components.SettingsGroup
 import com.cl0de.app.ui.components.SettingsRow
@@ -62,16 +64,16 @@ fun MessageActionsSheet(
             }
             SettingsGroup {
                 if (text.isNotBlank()) {
-                    SettingsRow("Copy", icon = Ic.Copy, onClick = done { clip.setText(AnnotatedString(text)); Graph.chats.toasts.tryEmit("Copied") })
-                    SettingsRow("Select text", icon = Ic.IBeam, onClick = done(onSelect))
+                    SettingsRow(S.copy, icon = Ic.Copy, onClick = done { clip.setText(AnnotatedString(text)); Graph.chats.toasts.tryEmit(S.copied) })
+                    SettingsRow(SChat.selectText, icon = Ic.IBeam, onClick = done(onSelect))
                 }
-                onEdit?.let { SettingsRow("Edit", subtitle = "Rewinds the session to this message", icon = Ic.Edit, onClick = done(it)) }
-                onRetry?.let { SettingsRow("Retry", icon = Ic.Refresh, onClick = done(it)) }
-                SettingsRow("Fork from here", icon = Ic.Branch, onClick = done(onFork))
-                if (text.isNotBlank()) SettingsRow("Share", icon = Ic.Share, onClick = done {
+                onEdit?.let { SettingsRow(S.edit, subtitle = SChat.editRewindsSub, icon = Ic.Edit, onClick = done(it)) }
+                onRetry?.let { SettingsRow(S.retry, icon = Ic.Refresh, onClick = done(it)) }
+                SettingsRow(SChat.forkFromHere, icon = Ic.Branch, onClick = done(onFork))
+                if (text.isNotBlank()) SettingsRow(S.share, icon = Ic.Share, onClick = done {
                     ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), null))
                 })
-                SettingsRow("Delete message", icon = Ic.Trash, titleColor = c.danger, onClick = done(onDelete))
+                SettingsRow(SChat.deleteMessage, icon = Ic.Trash, titleColor = c.danger, onClick = done(onDelete))
             }
         }
     }
@@ -80,7 +82,7 @@ fun MessageActionsSheet(
 @Composable
 fun SelectTextSheet(text: String, onDismiss: () -> Unit) {
     val c = Oc.c
-    OcSheet(onDismiss, "Select text", skipHalf = false) {
+    OcSheet(onDismiss, SChat.selectText, skipHalf = false) {
         Box(Modifier.fillMaxWidth().heightIn(max = 560.dp).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
             SelectionContainer { Text(text, color = c.text, fontSize = 17.sp, lineHeight = 26.sp, fontFamily = Oc.body) }
         }

@@ -37,6 +37,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.cl0de.app.BuildConfig
 import com.cl0de.app.Graph
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SSet
 import com.cl0de.app.data.Updater
 import com.cl0de.app.data.Updater.State
 import com.cl0de.app.ui.theme.Oc
@@ -82,16 +84,16 @@ fun UpdateHost() {
         Column(Modifier.navigationBarsPadding().padding(horizontal = 24.dp, vertical = 24.dp)) {
             Txt(
                 when (st) {
-                    is State.Checking, is State.Idle -> "Checking for updates…"
-                    is State.UpToDate -> "You're up to date"
-                    is State.Failed -> "Update didn't go through"
-                    else -> "Update available"
+                    is State.Checking, is State.Idle -> SSet.checkingForUpdates
+                    is State.UpToDate -> SSet.upToDate
+                    is State.Failed -> SSet.updateDidntGoThrough
+                    else -> SSet.updateAvailable
                 },
                 size = 22.sp, weight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(6.dp))
             Txt(
-                if (r != null) "v${Updater.current}  →  ${r.name.removePrefix("v").let { "v$it" }}" else "v${Updater.current} is the newest version on GitHub.",
+                if (r != null) "v${Updater.current}  →  ${r.name.removePrefix("v").let { "v$it" }}" else SSet.newestVersion(Updater.current),
                 size = 15.sp, color = c.textDim,
             )
             if (r != null && r.notes.isNotBlank() && st !is State.Failed) {
@@ -103,7 +105,7 @@ fun UpdateHost() {
             (st as? State.Failed)?.let { Spacer(Modifier.height(12.dp)); Txt(it.message, size = 14.sp, color = c.danger, lineHeight = 20.sp) }
             if (BuildConfig.DEBUG && r != null) {
                 Spacer(Modifier.height(10.dp))
-                Txt("This is a test build: the release app installs next to it.", size = 13.sp, color = c.textDim)
+                Txt(SSet.testBuildNote, size = 13.sp, color = c.textDim)
             }
             Spacer(Modifier.height(20.dp))
             when (val s = st) {
@@ -112,22 +114,22 @@ fun UpdateHost() {
                         Box(Modifier.fillMaxWidth(s.progress.coerceIn(0.02f, 1f)).height(6.dp).clip(CircleShape).background(c.accent))
                     }
                     Spacer(Modifier.height(10.dp))
-                    Txt("Downloading… ${(s.progress * 100).toInt()}%" + if (s.r.size > 0) "  ·  ${s.r.size / 1_048_576} MB" else "", size = 14.sp, color = c.textDim)
+                    Txt(SSet.downloadingPct((s.progress * 100).toInt()) + if (s.r.size > 0) "  ·  ${s.r.size / 1_048_576} MB" else "", size = 14.sp, color = c.textDim)
                 }
-                is State.Installing -> Txt("Opening the installer…", size = 14.sp, color = c.textDim)
-                is State.Available, is State.Failed -> if (r == null) Pill("Try again", { Updater.check() }, Modifier.fillMaxWidth())
+                is State.Installing -> Txt(SSet.openingInstaller, size = 14.sp, color = c.textDim)
+                is State.Available, is State.Failed -> if (r == null) Pill(SSet.tryAgain, { Updater.check() }, Modifier.fillMaxWidth())
                     else if (!allowed) {
-                        Txt("Android asks once to let OpenCode install updates.", size = 14.sp, color = c.textDim, lineHeight = 20.sp)
+                        Txt(SSet.androidAsksInstall, size = 14.sp, color = c.textDim, lineHeight = 20.sp)
                         Spacer(Modifier.height(12.dp))
-                        Pill("Allow installs", { Updater.openInstallPermission(ctx) }, Modifier.fillMaxWidth())
-                    } else Pill(if (s is State.Failed) "Try again" else "Install", { Updater.install(ctx, r) }, Modifier.fillMaxWidth())
-                else -> Pill("Close", ::close, Modifier.fillMaxWidth(), filled = false)
+                        Pill(SSet.allowInstalls, { Updater.openInstallPermission(ctx) }, Modifier.fillMaxWidth())
+                    } else Pill(if (s is State.Failed) SSet.tryAgain else SSet.install, { Updater.install(ctx, r) }, Modifier.fillMaxWidth())
+                else -> Pill(S.close, ::close, Modifier.fillMaxWidth(), filled = false)
             }
             if (r != null && (st is State.Available || st is State.Failed)) {
                 Spacer(Modifier.height(4.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Txt("Skip this version", Modifier.clip(CircleShape).tap(scale = 1f) { Graph.prefs.updateSkipped = r.tag; close() }.padding(vertical = 12.dp), size = 15.sp, color = c.textDim)
-                    Txt("Later", Modifier.clip(CircleShape).tap(scale = 1f, onClick = ::close).padding(vertical = 12.dp), size = 15.sp, color = c.text)
+                    Txt(SSet.skipThisVersion, Modifier.clip(CircleShape).tap(scale = 1f) { Graph.prefs.updateSkipped = r.tag; close() }.padding(vertical = 12.dp), size = 15.sp, color = c.textDim)
+                    Txt(SSet.later, Modifier.clip(CircleShape).tap(scale = 1f, onClick = ::close).padding(vertical = 12.dp), size = 15.sp, color = c.text)
                 }
             }
         }

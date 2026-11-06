@@ -36,6 +36,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cl0de.app.data.SChat
 import com.cl0de.app.ui.theme.Oc
 import kotlin.math.PI
 import kotlin.math.sin
@@ -44,6 +45,20 @@ import kotlin.math.sin
 enum class Work(val label: String) {
     Think("Thinking"), Read("Reading files"), Write("Writing"), Edit("Editing code"),
     Run("Running a command"), Search("Searching"), Web("Browsing the web"), Plan("Planning"), Wait("Waiting for the provider"), Other("Working"),
+}
+
+/** The work label in the app language ([label] stays the English key). */
+internal fun Work.displayLabel(): String = when (this) {
+    Work.Think -> SChat.workThinking
+    Work.Read -> SChat.workReadingFiles
+    Work.Write -> SChat.workWriting
+    Work.Edit -> SChat.workEditingCode
+    Work.Run -> SChat.workRunningCommand
+    Work.Search -> SChat.workSearching
+    Work.Web -> SChat.workBrowsingWeb
+    Work.Plan -> SChat.workPlanning
+    Work.Wait -> SChat.workWaitingProvider
+    Work.Other -> SChat.workWorking
 }
 
 /**
@@ -57,7 +72,7 @@ fun ThinkingIndicator(work: Work, modifier: Modifier = Modifier) {
         WorkGlyph(work, 22.dp)
         Spacer(Modifier.width(10.dp))
         AnimatedContent(
-            work.label, label = "thinking-label",
+            work.displayLabel(), label = "thinking-label",
             transitionSpec = { (fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 2 }) togetherWith (fadeOut(tween(160)) + slideOutVertically(tween(160)) { -it / 2 }) },
         ) { text -> ShimmerText(text) }
     }

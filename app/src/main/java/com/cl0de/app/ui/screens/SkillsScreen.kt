@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
 import com.cl0de.app.api.NamedItem
 import com.cl0de.app.data.CHAT_DIR
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SMisc
 import com.cl0de.app.data.Skills
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.Route
@@ -83,8 +85,8 @@ private fun Modifier.skillCard(): Modifier {
 suspend fun startSkillChat(ctx: android.content.Context, about: String = ""): String {
     Graph.paths.host(CHAT_DIR).mkdirs()
     val s = Graph.chats.createSession(CHAT_DIR)
-    val ask = if (about.isBlank()) "I want to create a new skill. Ask me what it should do, then write it."
-    else "Create a skill: $about"
+    val ask = if (about.isBlank()) SMisc.createSkillAsk
+    else SMisc.createSkillAbout(about)
     Graph.chats.send(ctx, s.id, ask + "\n\n(Save it as ${Skills.DIR}/<name>/SKILL.md.)", emptyList())
     return s.id
 }
@@ -109,15 +111,15 @@ fun SkillsScreen(nav: Nav) {
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
             runCatching { Skills.import(ctx, uri) }
-                .onSuccess { names -> reload++; Graph.chats.toasts.tryEmit("Added " + names.joinToString { "/$it" }) }
-                .onFailure { Graph.chats.toasts.tryEmit(it.message ?: "Could not import") }
+                .onSuccess { names -> reload++; Graph.chats.toasts.tryEmit(SMisc.addedSkills(names.joinToString { "/$it" })) }
+                .onFailure { Graph.chats.toasts.tryEmit(it.message ?: SMisc.couldNotImport) }
         }
     }
     fun chat() {
         if (busy) return
         busy = true
         scope.launch {
-            runCatching { startSkillChat(ctx) }.onSuccess { nav.openChat(it) }.onFailure { Graph.chats.toasts.tryEmit(it.message ?: "Could not start the chat") }
+            runCatching { startSkillChat(ctx) }.onSuccess { nav.openChat(it) }.onFailure { Graph.chats.toasts.tryEmit(it.message ?: SMisc.couldNotStartChat) }
             busy = false
         }
     }
@@ -132,47 +134,47 @@ fun SkillsScreen(nav: Nav) {
         TopBar("Skills", left = { IconBtn(Ic.Back, { nav.pop() }) }, right = { IconBtn(Ic.Plus, { nav.push(Route.SkillEdit("")) }) })
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding().padding(bottom = 32.dp)) {
             Txt(
-                "Skills teach OpenCode how to do a job your way. It loads one when the task fits, or when you type /name in the chat.",
+                SMisc.skillsIntro,
                 Modifier.padding(horizontal = 20.dp).padding(bottom = 14.dp), size = 15.sp, color = c.textDim, lineHeight = 21.sp,
             )
             Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                AddTile(Ic.Chat, "Create in chat", "Describe it, OpenCode writes it", Modifier.weight(1f)) { chat() }
-                AddTile(Ic.Edit, "Write it", "Name, when to use, steps", Modifier.weight(1f)) { nav.push(Route.SkillEdit("")) }
+                AddTile(Ic.Chat, SMisc.createInChat, SMisc.createInChatSub, Modifier.weight(1f)) { chat() }
+                AddTile(Ic.Edit, SMisc.writeIt, SMisc.writeItSub, Modifier.weight(1f)) { nav.push(Route.SkillEdit("")) }
             }
             Spacer(Modifier.height(10.dp))
             Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                AddTile(Ic.FileUp, "Import file", "Claude or ChatGPT .zip, .skill, SKILL.md", Modifier.weight(1f)) { importer.launch(arrayOf("*/*")) }
-                AddTile(Ic.Copy, "Paste instructions", "From a custom GPT or a Claude project", Modifier.weight(1f)) { paste = true }
+                AddTile(Ic.FileUp, SMisc.importFile, "Claude or ChatGPT .zip, .skill, SKILL.md", Modifier.weight(1f)) { importer.launch(arrayOf("*/*")) }
+                AddTile(Ic.Copy, SMisc.pasteInstructions, SMisc.pasteInstructionsSub, Modifier.weight(1f)) { paste = true }
             }
 
             if (mine.size + builtIn.size > 4) SearchPill(query, { query = it }, Modifier.padding(start = 16.dp, end = 16.dp, top = 18.dp))
 
-            SectionLabel("Your skills")
+            SectionLabel(SMisc.yourSkills)
             val shown = mine.filter { hit(it.name, it.description) }
-            if (mine.isEmpty()) Txt("No skills yet. Make one above, or import the ones you use in Claude or ChatGPT.", Modifier.padding(horizontal = 20.dp), size = 15.sp, color = c.textDim, lineHeight = 21.sp)
+            if (mine.isEmpty()) Txt(SMisc.noSkillsYet, Modifier.padding(horizontal = 20.dp), size = 15.sp, color = c.textDim, lineHeight = 21.sp)
             Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                shown.forEach { s -> SkillCard(s.name, s.description, if (s.files > 1) "${s.files} files" else null) { nav.push(Route.SkillEdit(s.name)) } }
+                shown.forEach { s -> SkillCard(s.name, s.description, if (s.files > 1) SMisc.filesCount(s.files) else null) { nav.push(Route.SkillEdit(s.name)) } }
             }
             val bi = builtIn.filter { hit(it.name, it.description) }
             if (bi.isNotEmpty()) {
-                SectionLabel("Built in")
+                SectionLabel(SMisc.builtIn)
                 Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    bi.forEach { s -> SkillCard(s.name, s.description.orEmpty(), "read only") { nav.push(Route.SkillEdit("builtin:" + s.name)) } }
+                    bi.forEach { s -> SkillCard(s.name, s.description.orEmpty(), SMisc.readOnly) { nav.push(Route.SkillEdit("builtin:" + s.name)) } }
                 }
             }
             val cm = cmds.filter { hit(it.name, it.description) }
             if (cm.isNotEmpty()) {
-                SectionLabel("Commands")
+                SectionLabel(SMisc.commandsLabel)
                 Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    cm.forEach { s -> SkillCard(s.name, s.description.orEmpty(), "command", icon = Ic.Terminal) {} }
+                    cm.forEach { s -> SkillCard(s.name, s.description.orEmpty(), SMisc.commandBadge, icon = Ic.Terminal) {} }
                 }
             }
         }
     }
     if (paste) PasteSheet({ paste = false }) { name, desc, text ->
         runCatching { Skills.fromInstructions(name, desc, text) }
-            .onSuccess { paste = false; reload++; Graph.chats.toasts.tryEmit("Saved /$it") }
-            .onFailure { Graph.chats.toasts.tryEmit(it.message ?: "Could not save") }
+            .onSuccess { paste = false; reload++; Graph.chats.toasts.tryEmit(SMisc.savedSkill(it)) }
+            .onFailure { Graph.chats.toasts.tryEmit(it.message ?: SMisc.couldNotSave) }
     }
 }
 
@@ -194,7 +196,7 @@ private fun SearchPill(value: String, onChange: (String) -> Unit, modifier: Modi
     Row(modifier.fillMaxWidth().clip(Oc.pill).background(c.surface).padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         Ico(Ic.Search, tint = c.textDim, size = 18.dp); Spacer(Modifier.width(10.dp))
         Box(Modifier.weight(1f)) {
-            if (value.isEmpty()) Txt("Search skills", size = 16.sp, color = c.textDim)
+            if (value.isEmpty()) Txt(SMisc.searchSkills, size = 16.sp, color = c.textDim)
             BasicTextField(value, onChange, singleLine = true, textStyle = TextStyle(color = c.text, fontSize = 16.sp, fontFamily = Oc.body), cursorBrush = SolidColor(c.text), modifier = Modifier.fillMaxWidth())
         }
     }
@@ -228,16 +230,16 @@ private fun PasteSheet(onDismiss: () -> Unit, onSave: (String, String, String) -
     var name by remember { mutableStateOf("") }
     var desc by remember { mutableStateOf("") }
     var text by remember { mutableStateOf("") }
-    OcSheet(onDismiss, title = "Paste instructions") {
+    OcSheet(onDismiss, title = SMisc.pasteInstructions) {
         Column(Modifier.verticalScroll(rememberScrollState()).imePadding().padding(horizontal = 20.dp).padding(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Txt(
-                "ChatGPT: open your GPT → Edit → Configure and copy Instructions. Claude: copy a project's instructions. They become a skill you can call with /name.",
+                SMisc.pasteSheetBody,
                 size = 14.sp, color = c.textDim, lineHeight = 20.sp,
             )
-            OcTextField(name, { name = it }, placeholder = "Name, e.g. code-reviewer")
-            OcTextField(desc, { desc = it }, placeholder = "When to use it (optional)", singleLine = false)
-            OcTextField(text, { text = it }, placeholder = "Paste the instructions", singleLine = false, minLines = 6)
-            Pill("Save skill", { onSave(name.ifBlank { "imported" }, desc, text) }, Modifier.fillMaxWidth(), enabled = text.isNotBlank())
+            OcTextField(name, { name = it }, placeholder = SMisc.nameExample)
+            OcTextField(desc, { desc = it }, placeholder = SMisc.whenToUseOptional, singleLine = false)
+            OcTextField(text, { text = it }, placeholder = SMisc.pasteTheInstructions, singleLine = false, minLines = 6)
+            Pill(SMisc.saveSkill, { onSave(name.ifBlank { "imported" }, desc, text) }, Modifier.fillMaxWidth(), enabled = text.isNotBlank())
         }
     }
 }
@@ -262,12 +264,12 @@ fun SkillEditScreen(arg: String, nav: Nav) {
     fun save(then: (String) -> Unit = {}) {
         runCatching { Skills.save(name, desc, body, existing?.name) }
             .onSuccess { then(it) }
-            .onFailure { Graph.chats.toasts.tryEmit(it.message ?: "Could not save") }
+            .onFailure { Graph.chats.toasts.tryEmit(it.message ?: SMisc.couldNotSave) }
     }
 
     Column(Modifier.fillMaxSize().screenBackdrop("SkillsScreen2").imePadding()) {
         TopBar(
-            if (isNew) "New skill" else "/$name",
+            if (isNew) SMisc.newSkill else "/$name",
             left = { IconBtn(Ic.Back, { nav.pop() }) },
             right = {
                 if (!builtIn && !isNew) IconBtn(Ic.Trash, { confirmDelete = true })
@@ -279,17 +281,17 @@ fun SkillEditScreen(arg: String, nav: Nav) {
                 Box(Modifier.fillMaxWidth().skillCard().padding(16.dp)) { Txt(body, size = 13.sp, family = Oc.mono, lineHeight = 19.sp) }
                 return@Column
             }
-            Label("Name")
+            Label(S.name)
             OcTextField(name, { name = it.replace(' ', '-').lowercase() }, placeholder = "my-skill", mono = true)
-            Label("When to use it")
-            OcTextField(desc, { desc = it }, placeholder = "E.g. Use when I ask for a cover letter or a CV", singleLine = false)
-            Label("Instructions")
-            OcTextField(body, { body = it }, placeholder = "Step by step: what to do, what to avoid, the format of the result…", singleLine = false, minLines = 10, mono = true)
+            Label(SMisc.whenToUseIt)
+            OcTextField(desc, { desc = it }, placeholder = SMisc.whenExample, singleLine = false)
+            Label(SMisc.instructionsLabel)
+            OcTextField(body, { body = it }, placeholder = SMisc.instructionsPlaceholder, singleLine = false, minLines = 10, mono = true)
             if (existing != null && existing.files > 1)
-                Txt("Plus ${existing.files - 1} more files in ${Skills.DIR}/${existing.name}", size = 13.sp, color = c.textDim)
+                Txt(SMisc.plusMoreFiles(existing.files - 1, "${Skills.DIR}/${existing.name}"), size = 13.sp, color = c.textDim)
         }
         if (!builtIn) Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            if (!isNew) SmallButton("Try in chat", {
+            if (!isNew) SmallButton(SMisc.tryInChat, {
                 val go = { n: String ->
                     scope.launch {
                         runCatching {
@@ -302,13 +304,13 @@ fun SkillEditScreen(arg: String, nav: Nav) {
                 if (dirty) save { go(it) } else go(name)
             })
             Spacer(Modifier.weight(1f))
-            Pill(if (isNew) "Create" else "Save", { save { Graph.chats.toasts.tryEmit("Saved /$it"); nav.pop() } }, enabled = name.isNotBlank() && body.isNotBlank() && (dirty || isNew))
+            Pill(if (isNew) S.create else S.save, { save { Graph.chats.toasts.tryEmit(SMisc.savedSkill(it)); nav.pop() } }, enabled = name.isNotBlank() && body.isNotBlank() && (dirty || isNew))
         }
     }
     if (confirmDelete) com.cl0de.app.ui.components.OcDialog(
-        "Delete /$name?", { confirmDelete = false }, confirmText = "Delete", danger = true,
+        S.deleteNamed("/$name"), { confirmDelete = false }, confirmText = S.delete, danger = true,
         onConfirm = { Skills.delete(existing?.name ?: name); confirmDelete = false; nav.pop() },
-    ) { Txt("The skill folder and its files will be removed.", size = 15.sp, color = c.textDim) }
+    ) { Txt(SMisc.skillFolderRemoved, size = 15.sp, color = c.textDim) }
 }
 
 @Composable

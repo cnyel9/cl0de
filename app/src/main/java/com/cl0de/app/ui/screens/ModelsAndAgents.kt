@@ -24,6 +24,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SMisc
 import com.cl0de.app.api.NamedItem
 import com.cl0de.app.api.str
 import com.cl0de.app.ui.Nav
@@ -56,22 +58,22 @@ fun ModelsScreen(nav: Nav) {
     var pickSmall by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { cfg = runCatching { Graph.api.config() }.getOrDefault(cfg) }
     Column(Modifier.fillMaxSize().screenBackdrop("ModelsAndAgents1")) {
-        TopBar("Models", left = { IconBtn(Ic.Back, { nav.pop() }) })
+        TopBar(S.models, left = { IconBtn(Ic.Back, { nav.pop() }) })
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding().padding(bottom = 32.dp)) {
             SettingsGroup {
-                SettingsRow("Model for new messages", subtitle = Graph.catalog.selectedLabel(), icon = Ic.Cpu, chevron = true, onClick = { pickMain = true })
-                SettingsRow("Small model", subtitle = cfg.str("small_model") ?: "Auto (titles & summaries)", icon = Ic.Sparkle, chevron = true, onClick = { pickSmall = true })
+                SettingsRow(SMisc.modelForNewMessages, subtitle = Graph.catalog.selectedLabel(), icon = Ic.Cpu, chevron = true, onClick = { pickMain = true })
+                SettingsRow(SMisc.smallModel, subtitle = cfg.str("small_model") ?: SMisc.autoTitlesSummaries, icon = Ic.Sparkle, chevron = true, onClick = { pickSmall = true })
             }
-            SectionLabel("Available")
+            SectionLabel(SMisc.available)
             SettingsGroup {
-                providers.forEach { p -> SettingsRow(p.name.ifBlank { p.id }, subtitle = "${p.models.size} models", icon = Ic.Server) }
+                providers.forEach { p -> SettingsRow(p.name.ifBlank { p.id }, subtitle = SMisc.modelsCount(p.models.size), icon = Ic.Server) }
             }
         }
     }
     if (pickMain) ModelSheet { pickMain = false }
-    if (pickSmall) OcSheet({ pickSmall = false }, "Small model", skipHalf = false) {
+    if (pickSmall) OcSheet({ pickSmall = false }, SMisc.smallModel, skipHalf = false) {
         LazyColumn(Modifier.padding(bottom = 24.dp)) {
-            item { ChoiceRow("Auto", cfg.str("small_model") == null, { pickSmall = false }, subtitle = "Let OpenCode choose") }
+            item { ChoiceRow(SMisc.autoLabel, cfg.str("small_model") == null, { pickSmall = false }, subtitle = SMisc.letOpenCodeChoose) }
             providers.forEach { p ->
                 items(p.models.values.toList(), key = { p.id + it.id }) { m ->
                     val ref = p.id + "/" + m.id
@@ -100,20 +102,20 @@ fun PermissionsScreen(nav: Nav) {
     fun set(k: String, v: String) = scope.launch {
         cfg = runCatching { Graph.api.patchConfig(buildJsonObject { put("permission", buildJsonObject { put(k, v) }) }) }.getOrDefault(cfg)
     }
-    val opts = listOf("allow" to "Allow", "ask" to "Ask", "deny" to "Deny")
+    val opts = listOf("allow" to SMisc.allow, "ask" to SMisc.ask, "deny" to SMisc.deny)
     Column(Modifier.fillMaxSize().screenBackdrop("ModelsAndAgents2")) {
-        TopBar("Permissions", left = { IconBtn(Ic.Back, { nav.pop() }) })
+        TopBar(SMisc.permissions, left = { IconBtn(Ic.Back, { nav.pop() }) })
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding().padding(bottom = 32.dp)) {
-            SectionLabel("New sessions")
+            SectionLabel(SMisc.newSessions)
             Column(Modifier.padding(horizontal = 16.dp)) {
-                Segmented(listOf("ask" to "Ask", "edits" to "Auto-edit", "auto" to "Auto"), Graph.prefs.permissionMode, { Graph.prefs.permissionMode = it })
+                Segmented(listOf("ask" to SMisc.ask, "edits" to SMisc.autoEdit, "auto" to SMisc.autoLabel), Graph.prefs.permissionMode, { Graph.prefs.permissionMode = it })
                 Txt(
-                    "Applied to every session you start. Auto-edit lets the agent change files but asks before shell commands and web access.",
+                    SMisc.permissionsDesc,
                     size = 14.sp, color = c.textDim, modifier = Modifier.padding(top = 10.dp), lineHeight = 20.sp,
                 )
             }
-            SectionLabel("Global rules (opencode.json)")
-            listOf("edit" to "File edits", "bash" to "Shell commands", "webfetch" to "Web fetch", "external_directory" to "Outside the project").forEach { (k, label) ->
+            SectionLabel(SMisc.globalRules)
+            listOf("edit" to SMisc.fileEdits, "bash" to SMisc.shellCommands, "webfetch" to SMisc.webFetch, "external_directory" to SMisc.outsideProject).forEach { (k, label) ->
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                     Txt(label, size = 17.sp, modifier = Modifier.padding(bottom = 8.dp, start = 4.dp))
                     Segmented(opts, valueOf(k), { set(k, it) })
@@ -130,13 +132,13 @@ fun AgentsScreen(nav: Nav) {
     val agents by Graph.catalog.agents.collectAsState()
     LaunchedEffect(Unit) { Graph.catalog.refresh() }
     Column(Modifier.fillMaxSize().screenBackdrop("ModelsAndAgents3")) {
-        TopBar("Agents", left = { IconBtn(Ic.Back, { nav.pop() }) })
+        TopBar(SMisc.agents, left = { IconBtn(Ic.Back, { nav.pop() }) })
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding().padding(bottom = 32.dp)) {
             SettingsGroup {
                 agents.forEach { a ->
                     SettingsRow(
                         a.name.replaceFirstChar { it.uppercase() }, subtitle = a.description, icon = Ic.Bot,
-                        trailing = { if (Graph.prefs.agent == a.name) Chip("Active", color = c.link) },
+                        trailing = { if (Graph.prefs.agent == a.name) Chip(SMisc.active, color = c.link) },
                         onClick = {
                             Graph.prefs.agent = a.name
                             scope.launch { runCatching { Graph.api.patchConfig(buildJsonObject { put("default_agent", a.name) }) } }
@@ -144,7 +146,7 @@ fun AgentsScreen(nav: Nav) {
                     )
                 }
             }
-            Txt("Custom agents can be added in the config (agent section) or as markdown files in ~/.config/opencode/agent inside the container.", size = 14.sp, color = c.textDim, modifier = Modifier.padding(20.dp), lineHeight = 20.sp)
+            Txt(SMisc.customAgentsNote, size = 14.sp, color = c.textDim, modifier = Modifier.padding(20.dp), lineHeight = 20.sp)
         }
     }
 }

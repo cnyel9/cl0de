@@ -76,7 +76,7 @@ object Scheduler {
                     runCatching {
                         val s = Graph.chats.createSession(t.directory)
                         Graph.chats.send(app, s.id, t.prompt, emptyList())
-                    }.onFailure { Graph.chats.toasts.tryEmit("Scheduled task failed: ${it.message}") }
+                    }.onFailure { Graph.chats.toasts.tryEmit(SMisc.scheduledTaskFailed(it.message)) }
                     val done = t.copy(lastRun = System.currentTimeMillis(), enabled = t.repeat != "once")
                     upsert(app, done)
                 } finally { pr.finish() }

@@ -40,6 +40,8 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.BuildConfig
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SSet
 import com.cl0de.app.Graph
 import com.cl0de.app.api.OcJson
 import com.cl0de.app.api.str
@@ -86,14 +88,14 @@ fun ConnectorsScreen(nav: Nav) {
     LaunchedEffect(Unit) { load() }
     Box(Modifier.fillMaxSize().screenBackdrop("MoreScreens1")) {
         Column(Modifier.fillMaxSize()) {
-            TopBar("Connectors", left = { IconBtn(Ic.Back, { nav.pop() }) })
+            TopBar(SSet.connectors, left = { IconBtn(Ic.Back, { nav.pop() }) })
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding().padding(bottom = 120.dp)) {
                 val s = status
                 if (s == null) Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { Spinner(28.dp) }
-                else if (s.isEmpty()) Txt("No MCP servers configured. Connectors give the agent extra tools — databases, browsers, docs.", Modifier.padding(24.dp), size = 16.sp, color = c.textDim, lineHeight = 23.sp)
+                else if (s.isEmpty()) Txt(SSet.noMcpServers, Modifier.padding(24.dp), size = 16.sp, color = c.textDim, lineHeight = 23.sp)
                 else SettingsGroup {
                     s.forEach { (name, v) ->
-                        val st = (v as? JsonObject)?.str("status") ?: "unknown"
+                        val st = (v as? JsonObject)?.str("status") ?: SSet.unknown
                         val on = st == "connected"
                         SettingsRow(name, subtitle = (v as? JsonObject)?.str("error") ?: st.replace('_', ' '), icon = Ic.Puzzle, trailing = {
                             OcSwitch(on) { want ->
@@ -104,7 +106,7 @@ fun ConnectorsScreen(nav: Nav) {
                 }
             }
         }
-        Box(Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(16.dp)) { Pill("Add connector", { add = true }, icon = Ic.Plus) }
+        Box(Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(16.dp)) { Pill(SSet.addConnector, { add = true }, icon = Ic.Plus) }
     }
     if (add) AddConnectorDialog({ add = false; scope.launch { load() } })
 }
@@ -116,7 +118,7 @@ private fun AddConnectorDialog(onDone: () -> Unit) {
     var kind by remember { mutableStateOf("remote") }
     var target by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
-    OcDialog("Add connector", onDone, "Add", {
+    OcDialog(SSet.addConnector, onDone, S.add, {
         val cfg = if (kind == "remote") buildJsonObject { put("type", "remote"); put("url", target.trim()); put("enabled", true) }
         else buildJsonObject {
             put("type", "local"); put("enabled", true)
@@ -128,8 +130,8 @@ private fun AddConnectorDialog(onDone: () -> Unit) {
         }
     }) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            OcTextField(name, { name = it }, placeholder = "Name (e.g. github)")
-            Segmented(listOf("remote" to "Remote URL", "local" to "Local command"), kind, { kind = it })
+            OcTextField(name, { name = it }, placeholder = SSet.nameEgGithub)
+            Segmented(listOf("remote" to SSet.remoteUrl, "local" to SSet.localCommand), kind, { kind = it })
             OcTextField(target, { target = it }, placeholder = if (kind == "remote") "https://…/mcp" else "npx -y @modelcontextprotocol/server-everything", mono = true)
             error?.let { Txt(it, size = 14.sp, color = Oc.c.danger) }
         }
@@ -152,56 +154,56 @@ fun ServerScreen(nav: Nav) {
     var updating by remember { mutableStateOf<String?>(null) }
 
     Column(Modifier.fillMaxSize().screenBackdrop("MoreScreens2")) {
-        TopBar("Local server", left = { IconBtn(Ic.Back, { nav.pop() }) })
+        TopBar(SSet.localServer, left = { IconBtn(Ic.Back, { nav.pop() }) })
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding().padding(bottom = 32.dp)) {
             Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(Oc.round(24.dp)).background(c.surface).padding(20.dp)) {
                 val (label, color) = when (val s = rt) {
-                    is RuntimeState.Running -> "Running · OpenCode ${s.version}" to c.ok
-                    is RuntimeState.Starting -> "Starting…" to c.warn
+                    is RuntimeState.Running -> SSet.runningVersion(s.version) to c.ok
+                    is RuntimeState.Starting -> SSet.starting to c.warn
                     is RuntimeState.Crashed -> s.message to c.danger
-                    else -> "Stopped" to c.textDim
+                    else -> SSet.stopped to c.textDim
                 }
                 Txt(label, size = 19.sp, color = color)
                 Txt("Ubuntu 24.04 (proot) · 127.0.0.1:${prefs.serverPort}", size = 15.sp, color = c.textDim, modifier = Modifier.padding(top = 4.dp))
                 Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (rt is RuntimeState.Running || rt is RuntimeState.Starting) SmallButton("Stop", { Graph.runtime.stopServer() }, danger = true)
-                    else SmallButton("Start", { Graph.runtime.startServer() }, filled = true)
-                    SmallButton("Restart", { Graph.runtime.stopServer(); scope.launch { kotlinx.coroutines.delay(1200); Graph.runtime.startServer() } })
+                    if (rt is RuntimeState.Running || rt is RuntimeState.Starting) SmallButton(S.stop, { Graph.runtime.stopServer() }, danger = true)
+                    else SmallButton(SSet.start, { Graph.runtime.startServer() }, filled = true)
+                    SmallButton(SSet.restart, { Graph.runtime.stopServer(); scope.launch { kotlinx.coroutines.delay(1200); Graph.runtime.startServer() } })
                     SmallButton("Log", { showLog = true })
                 }
             }
             Spacer(Modifier.height(16.dp))
             SettingsGroup {
-                SettingsRow("Start with the app", icon = Ic.Zap, trailing = { OcSwitch(prefs.autoStartServer) { prefs.autoStartServer = it } })
-                SettingsRow("Keep CPU awake while running", icon = Ic.Server, trailing = { OcSwitch(prefs.keepAwake) { prefs.keepAwake = it } })
-                SettingsRow("Compatibility mode", subtitle = "PROOT_NO_SECCOMP — try if crashes happen on your phone", icon = Ic.Shield, trailing = { OcSwitch(prefs.noSeccomp) { prefs.noSeccomp = it } })
+                SettingsRow(SSet.startWithApp, icon = Ic.Zap, trailing = { OcSwitch(prefs.autoStartServer) { prefs.autoStartServer = it } })
+                SettingsRow(SSet.keepCpuAwake, icon = Ic.Server, trailing = { OcSwitch(prefs.keepAwake) { prefs.keepAwake = it } })
+                SettingsRow(SSet.compatibilityMode, subtitle = SSet.compatibilitySub, icon = Ic.Shield, trailing = { OcSwitch(prefs.noSeccomp) { prefs.noSeccomp = it } })
                 // Android 12+ kills "extra" child processes of apps (phantom process killer), and proot has many
-                SettingsRow("Server keeps stopping?", subtitle = "Developer options → turn on “Disable child process restrictions”", icon = Ic.Info, onClick = {
+                SettingsRow(SSet.serverKeepsStopping, subtitle = SSet.serverKeepsStoppingSub, icon = Ic.Info, onClick = {
                     runCatching { ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-                        .onFailure { Graph.chats.toasts.tryEmit("Turn on Developer options first: tap Build number 7 times in About phone") }
+                        .onFailure { Graph.chats.toasts.tryEmit(SSet.devOptionsToast) }
                 })
             }
             Spacer(Modifier.height(16.dp))
             SettingsGroup {
-                SettingsRow("Update OpenCode", subtitle = updating ?: "Installed: ${prefs.opencodeVersion.ifBlank { "?" }}", icon = Ic.Download, onClick = {
-                    if (updating == null) { updating = "Checking…"; scope.launch {
-                        updating = runCatching { "Updated to " + Graph.runtime.updateOpencode() }.getOrElse { it.message }
+                SettingsRow(SSet.updateOpenCode, subtitle = updating ?: SSet.installedVersion(prefs.opencodeVersion.ifBlank { "?" }), icon = Ic.Download, onClick = {
+                    if (updating == null) { updating = SSet.checking; scope.launch {
+                        updating = runCatching { SSet.updatedTo(Graph.runtime.updateOpencode()) }.getOrElse { it.message }
                     } }
                 })
-                SettingsRow("Install dev tools", subtitle = "git, ripgrep, curl, python3, build-essential", icon = Ic.Terminal, onClick = {
+                SettingsRow(SSet.installDevTools, subtitle = "git, ripgrep, curl, python3, build-essential", icon = Ic.Terminal, onClick = {
                     val lines = mutableStateListOf<String>(); tools = lines
                     scope.launch {
                         val code = Graph.runtime.installDevTools { l -> scope.launch(Dispatchers.Main) { lines.add(l) } }
-                        lines.add(if (code == 0) "✓ Done" else "✗ Failed (exit $code)")
+                        lines.add(if (code == 0) SSet.doneCheck else SSet.failedExit(code))
                     }
                 })
-                SettingsRow("Don't kill the server in background", subtitle = "Exempt the app from battery optimization", icon = Ic.Zap, onClick = {
+                SettingsRow(SSet.dontKillServer, subtitle = SSet.exemptBattery, icon = Ic.Zap, onClick = {
                     ctx.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + ctx.packageName)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 })
-                SettingsRow("Reset environment", subtitle = "Deletes Ubuntu and everything inside it", icon = Ic.Trash, titleColor = c.danger, onClick = { reset = true })
+                SettingsRow(SSet.resetEnvironment, subtitle = SSet.deletesUbuntu, icon = Ic.Trash, titleColor = c.danger, onClick = { reset = true })
             }
             Txt(
-                "Android 12+ may kill background child processes. If the server dies when the screen is off, run once from a computer:\n" +
+                SSet.adbHintPrefix +
                     "adb shell device_config put activity_manager max_phantom_processes 2147483647\n" +
                     "adb shell settings put global settings_enable_monitor_phantom_procs false",
                 size = 13.sp, color = c.textDim, modifier = Modifier.padding(20.dp), lineHeight = 19.sp, family = Oc.mono,
@@ -210,22 +212,22 @@ fun ServerScreen(nav: Nav) {
     }
 
     if (showLog) LogSheet(log) { showLog = false }
-    tools?.let { lines -> LogSheet(lines, "Installing tools") { tools = null } }
-    if (reset) OcDialog("Reset environment?", { reset = false }, "Reset", {
+    tools?.let { lines -> LogSheet(lines, SSet.installingTools) { tools = null } }
+    if (reset) OcDialog(SSet.resetEnvironmentQuestion, { reset = false }, SSet.reset, {
         reset = false; Graph.runtime.resetRuntime()
-    }, danger = true) { Txt("Ubuntu, OpenCode and all projects under /root will be deleted. Sessions history is lost too.", size = 16.sp, color = Oc.c.textDim) }
+    }, danger = true) { Txt(SSet.resetBody, size = 16.sp, color = Oc.c.textDim) }
 }
 
 @Composable
-private fun LogSheet(lines: List<String>, title: String = "Server log", onDismiss: () -> Unit) {
+private fun LogSheet(lines: List<String>, title: String = SSet.serverLog, onDismiss: () -> Unit) {
     val c = Oc.c
     val clip = LocalClipboardManager.current
     OcSheet(onDismiss, title, skipHalf = false) {
         Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            SmallButton("Copy", { clip.setText(AnnotatedString(lines.joinToString("\n"))) })
+            SmallButton(S.copy, { clip.setText(AnnotatedString(lines.joinToString("\n"))) })
         }
         Column(Modifier.fillMaxWidth().height(480.dp).verticalScroll(rememberScrollState(), reverseScrolling = true).padding(16.dp)) {
-            Txt(lines.joinToString("\n").ifBlank { "(empty)" }, size = 11.sp, family = Oc.mono, color = c.textDim, lineHeight = 15.sp)
+            Txt(lines.joinToString("\n").ifBlank { SSet.emptyLog }, size = 11.sp, family = Oc.mono, color = c.textDim, lineHeight = 15.sp)
         }
     }
 }
@@ -251,10 +253,10 @@ fun ConfigEditorScreen(nav: Nav) {
             importing = true; importMsg = null
             runCatching { com.cl0de.app.data.ConfigImport.import(importCtx, uri) }
                 .onSuccess { r ->
-                    importMsg = com.cl0de.app.data.AppLang.s("Berhasil masuk: ${r.providers} provider, ${r.models} model.", "Imported: ${r.providers} providers, ${r.models} models.")
+                    importMsg = SSet.importedCounts(r.providers, r.models)
                     load()
                 }
-                .onFailure { importMsg = it.message ?: com.cl0de.app.data.AppLang.s("Impor gagal", "Import failed") }
+                .onFailure { importMsg = it.message ?: SSet.importFailed }
             importing = false
         }
     }
@@ -262,25 +264,22 @@ fun ConfigEditorScreen(nav: Nav) {
     Column(Modifier.fillMaxSize().screenBackdrop("MoreScreens3")) {
         TopBar("Config", left = { IconBtn(Ic.Back, { nav.pop() }) }, right = { IconBtn(Ic.Refresh, { scope.launch { load() } }) })
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding().padding(horizontal = 16.dp).padding(bottom = 32.dp)) {
-            Txt("Everything OpenCode supports in opencode.json: models, agents, MCP, permissions, formatters, instructions, keybinds. Changes are merged and applied at once.", size = 14.sp, color = c.textDim, modifier = Modifier.padding(bottom = 12.dp), lineHeight = 20.sp)
+            Txt(SSet.configDescription, size = 14.sp, color = c.textDim, modifier = Modifier.padding(bottom = 12.dp), lineHeight = 20.sp)
             if (!loaded) Spinner(26.dp) else OcTextField(text, { text = it; msg = null }, singleLine = false, minLines = 16, mono = true)
             Spacer(Modifier.height(14.dp))
-            Pill("Save", {
+            Pill(S.save, {
                 val o = runCatching { OcJson.parseToJsonElement(text) as JsonObject }.getOrNull()
-                if (o == null) msg = "Not valid JSON object"
-                else scope.launch { msg = runCatching { Graph.api.patchGlobalConfig(o); "Saved" }.getOrElse { it.message } }
+                if (o == null) msg = SSet.notValidJson
+                else scope.launch { msg = runCatching { Graph.api.patchGlobalConfig(o); SSet.saved }.getOrElse { it.message } }
             }, modifier = Modifier.fillMaxWidth())
-            msg?.let { Txt(it, size = 15.sp, color = if (it == "Saved") c.ok else c.danger, modifier = Modifier.padding(top = 12.dp)) }
+            msg?.let { Txt(it, size = 15.sp, color = if (it == SSet.saved) c.ok else c.danger, modifier = Modifier.padding(top = 12.dp)) }
             Spacer(Modifier.height(26.dp))
-            Txt(com.cl0de.app.data.AppLang.s("Impor dari aplikasi lama", "Import from the old app"), size = 16.sp, weight = androidx.compose.ui.text.font.FontWeight.SemiBold, modifier = Modifier.padding(bottom = 6.dp))
+            Txt(SSet.importFromOldApp, size = 16.sp, weight = androidx.compose.ui.text.font.FontWeight.SemiBold, modifier = Modifier.padding(bottom = 6.dp))
             Txt(
-                com.cl0de.app.data.AppLang.s(
-                    "Sumbernya: ekspor Backup dari aplikasi lama (file .tar.gz), atau salinan manual file .config/opencode/opencode.jsonc dari aplikasi lama, misalnya lewat Termux. Simpan dulu berkasnya ke penyimpanan bersama, lalu pilih di sini. Isinya digabungkan ke config ini.",
-                    "Source: a Backup export from the old app (.tar.gz file), or a manual copy of the old app's .config/opencode/opencode.jsonc, for example via Termux. Save the file to shared storage first, then pick it here. Its contents are merged into this config.",
-                ),
+                SSet.importFromOldAppDesc,
                 size = 14.sp, color = c.textDim, modifier = Modifier.padding(bottom = 12.dp), lineHeight = 20.sp,
             )
-            Pill(if (importing) com.cl0de.app.data.AppLang.s("Mengimpor...", "Importing...") else "Impor config aplikasi lama", { if (!importing) importer.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth())
+            Pill(if (importing) SSet.importing else SSet.importConfigOldApp, { if (!importing) importer.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth())
             importMsg?.let { Txt(it, size = 15.sp, color = c.textDim, modifier = Modifier.padding(top = 12.dp)) }
         }
     }
@@ -309,20 +308,20 @@ fun ProfileScreen(nav: Nav) {
         }
     }
     Column(Modifier.fillMaxSize().screenBackdrop("MoreScreens4")) {
-        TopBar("Profile", left = { IconBtn(Ic.Back, { nav.pop() }) })
+        TopBar(SSet.profile, left = { IconBtn(Ic.Back, { nav.pop() }) })
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding().padding(horizontal = 16.dp).padding(bottom = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Avatar(112.dp) { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
             Spacer(Modifier.height(14.dp))
-            SmallButton("Edit photo", { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) })
+            SmallButton(SSet.editPhoto, { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) })
             Column(Modifier.fillMaxWidth().padding(top = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Txt("What should we call you?", size = 17.sp, modifier = Modifier.padding(start = 4.dp))
+                Txt(SSet.whatCallYou, size = 17.sp, modifier = Modifier.padding(start = 4.dp))
                 OcTextField(name, { name = it })
-                Pill("Update profile", { prefs.userName = name.trim() }, enabled = name.trim() != prefs.userName, modifier = Modifier.fillMaxWidth())
+                Pill(SSet.updateProfile, { prefs.userName = name.trim() }, enabled = name.trim() != prefs.userName, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(10.dp))
-                Txt("What personal preferences should OpenCode consider in responses?", size = 19.sp, modifier = Modifier.padding(start = 4.dp))
-                Txt("Saved as global AGENTS.md — applies to every project.", size = 14.sp, color = c.textDim, modifier = Modifier.padding(start = 4.dp))
-                OcTextField(rules, { rules = it; saved = false }, singleLine = false, minLines = 6, placeholder = "Reply in Russian. Prefer small diffs. Ask before big refactors.")
-                Pill(if (saved) "Saved" else "Save preferences", {
+                Txt(SSet.personalPreferencesQuestion, size = 19.sp, modifier = Modifier.padding(start = 4.dp))
+                Txt(SSet.savedAsAgentsMd, size = 14.sp, color = c.textDim, modifier = Modifier.padding(start = 4.dp))
+                OcTextField(rules, { rules = it; saved = false }, singleLine = false, minLines = 6, placeholder = SSet.profileRulesPlaceholder)
+                Pill(if (saved) SSet.saved else SSet.savePreferences, {
                     runCatching { com.cl0de.app.data.Memory.saveUserRules(rules) }.onSuccess { saved = true }
                 }, enabled = !saved, modifier = Modifier.fillMaxWidth())
             }
@@ -338,40 +337,40 @@ fun AboutScreen(nav: Nav) {
     val ctx = LocalContext.current
     fun open(u: String) = ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(u)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     Column(Modifier.fillMaxSize().screenBackdrop("MoreScreens5")) {
-        TopBar("About", left = { IconBtn(Ic.Back, { nav.pop() }) })
+        TopBar(SSet.about, left = { IconBtn(Ic.Back, { nav.pop() }) })
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding().padding(bottom = 32.dp)) {
             SettingsGroup {
                 SettingsRow("OpenCode mobile", subtitle = "v${BuildConfig.VERSION_NAME}", icon = Ic.Info)
-                if (com.cl0de.app.ui.theme.Oc.look.id == "cloud") SettingsRow("Cl0de", subtitle = Graph.prefs.petCount.let { "Petted $it ${if (it == "1") "time" else "times"}" }, icon = Ic.Cloud, chevron = true, onClick = { nav.push(com.cl0de.app.ui.Route.MascotSettings) })
-                SettingsRow("Source on GitHub", subtitle = "cnyel9/cl0de", icon = Ic.GitHub, onClick = { open("https://github.com/cnyel9/cl0de") })
-                SettingsRow("OpenCode (in container)", subtitle = Graph.prefs.opencodeVersion.ifBlank { "not installed" }, icon = Ic.Terminal)
-                SettingsRow("OpenCode documentation", icon = Ic.External, onClick = { open("https://opencode.ai/docs") })
-                SettingsRow("OpenCode Go console", icon = Ic.External, onClick = { open("https://opencode.ai/console") })
+                if (com.cl0de.app.ui.theme.Oc.look.id == "cloud") SettingsRow("Cl0de", subtitle = Graph.prefs.petCount.let { "${SSet.petted} $it ${if (it == "1") SSet.timeWord else SSet.timesWord}" }, icon = Ic.Cloud, chevron = true, onClick = { nav.push(com.cl0de.app.ui.Route.MascotSettings) })
+                SettingsRow(SSet.sourceOnGitHub, subtitle = "cnyel9/cl0de", icon = Ic.GitHub, onClick = { open("https://github.com/cnyel9/cl0de") })
+                SettingsRow("OpenCode (in container)", subtitle = Graph.prefs.opencodeVersion.ifBlank { SSet.notInstalled }, icon = Ic.Terminal)
+                SettingsRow(SSet.openCodeDocumentation, icon = Ic.External, onClick = { open("https://opencode.ai/docs") })
+                SettingsRow(SSet.openCodeGoConsole, icon = Ic.External, onClick = { open("https://opencode.ai/console") })
             }
             // Updates from GitHub releases
             val upd by com.cl0de.app.data.Updater.state.collectAsState()
             SettingsGroup {
                 SettingsRow(
-                    "Check for updates", icon = Ic.Download, chevron = true,
+                    SSet.checkForUpdates, icon = Ic.Download, chevron = true,
                     subtitle = when (val u = upd) {
-                        is com.cl0de.app.data.Updater.State.Checking -> "Checking GitHub…"
-                        is com.cl0de.app.data.Updater.State.UpToDate -> "You're on the newest version"
-                        is com.cl0de.app.data.Updater.State.Available -> "${u.r.name} is out — tap to install"
-                        is com.cl0de.app.data.Updater.State.Downloading -> "Downloading ${(u.progress * 100).toInt()}%"
-                        is com.cl0de.app.data.Updater.State.Installing -> "Installing…"
+                        is com.cl0de.app.data.Updater.State.Checking -> SSet.checkingGitHub
+                        is com.cl0de.app.data.Updater.State.UpToDate -> SSet.youreOnNewest
+                        is com.cl0de.app.data.Updater.State.Available -> SSet.versionIsOut(u.r.name)
+                        is com.cl0de.app.data.Updater.State.Downloading -> SSet.downloadingPlain((u.progress * 100).toInt())
+                        is com.cl0de.app.data.Updater.State.Installing -> SSet.installing
                         is com.cl0de.app.data.Updater.State.Failed -> u.message
-                        else -> "From releases of ${com.cl0de.app.data.Updater.REPO}"
+                        else -> SSet.fromReleases(com.cl0de.app.data.Updater.REPO)
                     },
                     onClick = {
                         if (upd !is com.cl0de.app.data.Updater.State.Available) com.cl0de.app.data.Updater.check()
                         com.cl0de.app.ui.components.UpdateUi.open.value = true
                     },
                 )
-                SettingsRow("Check automatically", subtitle = "Looks for a new version when the app starts", icon = Ic.Refresh,
+                SettingsRow(SSet.checkAutomatically, subtitle = SSet.looksForNewVersion, icon = Ic.Refresh,
                     trailing = { OcSwitch(Graph.prefs.updateAuto) { Graph.prefs.updateAuto = it } })
             }
             Txt(
-                "Unofficial client. Bundles proot and libtalloc from the Termux packages (GPL-2.0 / LGPL-3.0) and downloads Ubuntu Base 24.04 and OpenCode (MIT) on first run.",
+                SSet.unofficialClientNote,
                 size = 13.sp, color = c.textDim, modifier = Modifier.padding(20.dp), lineHeight = 19.sp,
             )
         }

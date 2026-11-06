@@ -60,6 +60,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.cl0de.app.Graph
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SChat
 import com.cl0de.app.api.ModelInfo
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.Route
@@ -94,7 +96,7 @@ fun KimiModelPill(onClick: () -> Unit) {
     val c = Oc.c
     val prefs = Graph.prefs
     val providers by Graph.catalog.providers.collectAsState()
-    val name = providers.firstOrNull { it.id == prefs.providerId }?.models?.get(prefs.modelId)?.name?.takeIf { it.isNotBlank() } ?: prefs.modelId.ifBlank { "Model" }
+    val name = providers.firstOrNull { it.id == prefs.providerId }?.models?.get(prefs.modelId)?.name?.takeIf { it.isNotBlank() } ?: prefs.modelId.ifBlank { S.model }
     Row(
         Modifier.padding(start = 8.dp).height(48.dp).widthIn(max = 196.dp).clip(CircleShape).background(c.surfaceHigh.copy(alpha = 0.7f))
             .border(1.dp, c.border, CircleShape).tap(scale = 0.97f, onClick = onClick).padding(horizontal = 18.dp),
@@ -207,11 +209,11 @@ private enum class Mood { Idle, Happy, Angry, Sleep }
 fun KimiQuickChips(nav: Nav, code: Boolean, onPick: (String) -> Unit) {
     val c = Oc.c
     val items: List<Triple<String, ImageVector, () -> Unit>> = listOf(
-        Triple("New project", Ic.FilePlus) { nav.push(Route.Projects) },
+        Triple(S.newProject, Ic.FilePlus) { nav.push(Route.Projects) },
         Triple("Code", Ic.Code) { nav.root(Route.Code) },
-        Triple("Scheduled", Ic.Clock2) { nav.root(Route.Scheduled) },
-        Triple("Write", Ic.Edit) { onPick("Help me write ") },
-        Triple("Search the web", Ic.Globe) { onPick("Search the web for ") },
+        Triple(SChat.scheduled, Ic.Clock2) { nav.root(Route.Scheduled) },
+        Triple(SChat.writeLabel, Ic.Edit) { onPick("Help me write ") },
+        Triple(SChat.searchWeb, Ic.Globe) { onPick("Search the web for ") },
     )
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         items.forEach { (label, icon, act) ->
@@ -267,18 +269,18 @@ fun KimiModelPanel(onDismiss: () -> Unit, onMore: () -> Unit) {
                         (androidx.compose.animation.slideOutHorizontally(tween(260, easing = FastOutSlowInEasing)) { -it / 3 * dir } + androidx.compose.animation.fadeOut(tween(140)))
                 }) { pg ->
                     Column {
-                        if (pg != "main") KimiBackRow(when (pg) { "effort" -> "Reasoning level"; "agent" -> "Mode"; else -> "More models" }) { page = "main" }
+                        if (pg != "main") KimiBackRow(when (pg) { "effort" -> SChat.reasoningLevel; "agent" -> SChat.modeLabel; else -> SChat.moreModels }) { page = "main" }
                         when (pg) {
                             "effort" -> Column(Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState())) {
-                                KimiPanelRow("Default", "Let the model decide", prefs.variant.isBlank()) { prefs.variant = ""; page = "main" }
+                                KimiPanelRow(SChat.defaultLabel, SChat.letModelDecide, prefs.variant.isBlank()) { prefs.variant = ""; page = "main" }
                                 current?.variantNames.orEmpty().forEach { n ->
-                                    KimiPanelRow(n.replaceFirstChar { it.uppercase() }, if (n == "high" || n == "max") "Thinks longer, answers slower" else null, prefs.variant == n) { prefs.variant = n; page = "main" }
+                                    KimiPanelRow(n.replaceFirstChar { it.uppercase() }, if (n == "high" || n == "max") SChat.thinksLonger else null, prefs.variant == n) { prefs.variant = n; page = "main" }
                                 }
                             }
                             "agent" -> Column(Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState())) {
                                 // only primary agents; until the list comes from the server, Build and Plan
                                 val list = agents.filter { it.mode != "subagent" && !it.hidden }.map { it.name to it.description }
-                                    .ifEmpty { listOf("build" to "Makes changes and runs commands", "plan" to "Reads and plans, doesn't change files") }
+                                    .ifEmpty { listOf("build" to SChat.buildDesc, "plan" to SChat.planDesc) }
                                 list.forEach { (name, desc) ->
                                     KimiPanelRow(name.replaceFirstChar { it.uppercase() }, desc, prefs.agent == name) {
                                         prefs.agent = name
@@ -289,7 +291,7 @@ fun KimiModelPanel(onDismiss: () -> Unit, onMore: () -> Unit) {
                             }
                             "all" -> {
                                 var query by remember { mutableStateOf("") }
-                                PickSearch(query, { query = it }, "Search models")
+                                PickSearch(query, { query = it }, SChat.searchModels)
                                 androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 480.dp)) {
                                     providers.forEach { p ->
                                         val ms = p.models.values.filter { query.isBlank() || it.name.contains(query, true) || it.id.contains(query, true) }
@@ -305,7 +307,7 @@ fun KimiModelPanel(onDismiss: () -> Unit, onMore: () -> Unit) {
                                 }
                             }
                             else -> Column(Modifier.heightIn(max = 600.dp).verticalScroll(rememberScrollState())) {
-                                if (featured.isEmpty()) Txt("No connected providers yet.", Modifier.padding(24.dp), color = c.textDim)
+                                if (featured.isEmpty()) Txt(SChat.noProvidersYet, Modifier.padding(24.dp), color = c.textDim)
                                 featured.forEach { (pid, m) ->
                                     val sel = prefs.providerId == pid && prefs.modelId == m.id
                                     KimiPanelRow(m.name.ifBlank { m.id }, describe(m), sel) {
@@ -314,11 +316,11 @@ fun KimiModelPanel(onDismiss: () -> Unit, onMore: () -> Unit) {
                                     }
                                 }
                                 KimiDivider()
-                                KimiNavRow("More models", null) { page = "all" }
+                                KimiNavRow(SChat.moreModels, null) { page = "all" }
                                 KimiDivider()
                                 if (current != null && current.variantNames.isNotEmpty())
-                                    KimiNavRow("Reasoning level", prefs.variant.ifBlank { "Standard" }.replaceFirstChar { it.uppercase() }) { page = "effort" }
-                                KimiNavRow("Mode", prefs.agent.replaceFirstChar { it.uppercase() }) { page = "agent" }
+                                    KimiNavRow(SChat.reasoningLevel, prefs.variant.ifBlank { SChat.standard }.replaceFirstChar { it.uppercase() }) { page = "effort" }
+                                KimiNavRow(SChat.modeLabel, prefs.agent.replaceFirstChar { it.uppercase() }) { page = "agent" }
                             }
                         }
                     }
@@ -340,10 +342,10 @@ private fun KimiBackRow(title: String, onBack: () -> Unit) {
 }
 
 private fun describe(m: ModelInfo): String = buildList {
-    if (m.id.contains("free") || m.name.contains("Free", true)) add("Free")
-    m.limit?.context?.takeIf { it > 0 }?.let { add(if (it >= 1_000_000) "${it / 1_000_000}M context" else "${it / 1000}k context") }
-    if (m.reasoning) add("thinks before answering")
-    if (m.supportsImages) add("sees images")
+    if (m.id.contains("free") || m.name.contains("Free", true)) add(S.free)
+    m.limit?.context?.takeIf { it > 0 }?.let { add(SChat.contextOf(if (it >= 1_000_000) "${it / 1_000_000}M" else "${it / 1000}k")) }
+    if (m.reasoning) add(SChat.thinksBeforeAnswering)
+    if (m.supportsImages) add(SChat.seesImages)
 }.joinToString(" · ").replaceFirstChar { it.uppercase() }
 
 @Composable
@@ -405,17 +407,17 @@ fun KimiAddSheet(
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = state, containerColor = c.surfaceHigh, shape = RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp), dragHandle = null) {
         Column(Modifier.navigationBarsPadding().padding(top = 26.dp, bottom = 16.dp)) {
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                KimiTile("Camera", Ic.Camera) { onDismiss(); onCamera() }
-                KimiTile("Photos", Ic.Image) { onDismiss(); onPhotos() }
-                KimiTile("Local file", Ic.FileUp) { onDismiss(); onFiles() }
-                if (onVoice != null) KimiTile("Call", Ic.Phone) { onDismiss(); onVoice() }
-                KimiTile("Devices", Ic.Laptop) { close { nav.push(Route.Code) } }
+                KimiTile(SChat.camera, Ic.Camera) { onDismiss(); onCamera() }
+                KimiTile(SChat.photos, Ic.Image) { onDismiss(); onPhotos() }
+                KimiTile(SChat.localFile, Ic.FileUp) { onDismiss(); onFiles() }
+                if (onVoice != null) KimiTile(SChat.callLabel, Ic.Phone) { onDismiss(); onVoice() }
+                KimiTile(SChat.devices, Ic.Laptop) { close { nav.push(Route.Code) } }
             }
             Spacer(Modifier.height(18.dp))
-            KimiSheetRow(Ic.Puzzle, "Connectors", "Connect apps and databases to automate what you do") { close { nav.push(Route.Connectors) } }
-            KimiSheetRow(Ic.Scroll, "Skills", "Reuse specialised skills to get tasks done reliably") { close { nav.push(Route.Skills) } }
-            KimiSheetRow(Ic.Clock2, "Scheduled", "OpenCode runs a task on its own at the time you pick") { close { nav.root(Route.Scheduled) } }
-            KimiSheetRow(Ic.Shield, "Permissions", mapOf("ask" to "Asks before every change", "edits" to "Edits files freely, asks before commands", "auto" to "Runs everything without asking")[prefs.permissionMode] ?: "") { close { nav.push(Route.PermissionsCfg) } }
+            KimiSheetRow(Ic.Puzzle, SChat.connectors, SChat.connectAppsDesc) { close { nav.push(Route.Connectors) } }
+            KimiSheetRow(Ic.Scroll, "Skills", SChat.reuseSkillsDesc) { close { nav.push(Route.Skills) } }
+            KimiSheetRow(Ic.Clock2, SChat.scheduled, SChat.scheduledDesc) { close { nav.root(Route.Scheduled) } }
+            KimiSheetRow(Ic.Shield, SChat.permissions, mapOf("ask" to SChat.asksBeforeEvery, "edits" to SChat.editsFreelyAsks, "auto" to SChat.runsEverything)[prefs.permissionMode] ?: "") { close { nav.push(Route.PermissionsCfg) } }
         }
     }
 }
@@ -461,12 +463,12 @@ fun KimiHero(code: Boolean, typing: Boolean = false, onMore: () -> Unit) {
         val cloud = Oc.look.id == "cloud"
         val hello = remember(code, cloud) { if (cloud) Greetings.pick(name, code) else null }
         Txt(
-            hello ?: ((if (name.isBlank()) "Hi." else "Hi, $name.") + "\n" + (if (code) "What are we building today?" else "What shall we do today?")),
+            hello ?: ((if (name.isBlank()) SChat.hiPlain else SChat.hiName(name)) + "\n" + (if (code) SChat.whatBuilding else SChat.whatDoToday)),
             size = 25.sp, weight = FontWeight.SemiBold, align = TextAlign.Center, lineHeight = 34.sp,
         )
         Spacer(Modifier.height(18.dp))
         if (Oc.look.id != "cloud") Box(Modifier.clip(CircleShape).background(c.surfaceHigh.copy(alpha = 0.7f)).tap(scale = 0.96f, onClick = onMore).padding(horizontal = 18.dp, vertical = 10.dp)) {
-            Txt("More models", size = 16.sp, color = c.accent, weight = FontWeight.Medium)
+            Txt(SChat.moreModels, size = 16.sp, color = c.accent, weight = FontWeight.Medium)
         }
     }
 }

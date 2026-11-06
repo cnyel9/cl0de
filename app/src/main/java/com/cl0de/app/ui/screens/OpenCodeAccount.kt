@@ -69,6 +69,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.cl0de.app.Graph
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SAcct
 import com.cl0de.app.R
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.Route
@@ -162,7 +164,7 @@ fun ConsoleLoginScreen(method: String, nav: Nav) {
         handled = true; stage = "saving"
         scope.launch {
             try { connectAccount(key, via); delay(400); stage = "done" }
-            catch (e: Exception) { error = e.message ?: "Could not save the key"; stage = "error"; handled = false }
+            catch (e: Exception) { error = e.message ?: SAcct.couldNotSaveKey; stage = "error"; handled = false }
         }
     }
 
@@ -213,9 +215,9 @@ fun ConsoleLoginScreen(method: String, nav: Nav) {
                         if (webStage != "login") { Spinner(18.dp, stroke = 2.dp); Spacer(Modifier.width(12.dp)) }
                         Txt(
                             when (webStage) {
-                                "console" -> "Signed in. Opening your API keys…"
-                                "keys" -> "Creating a key for this phone… If nothing happens, tap “Create API Key”."
-                                else -> "Sign in to OpenCode. The app takes it from there."
+                                "console" -> SAcct.signedInOpeningKeys
+                                "keys" -> SAcct.creatingKeyForPhone
+                                else -> SAcct.signInToOpenCodeHint
                             },
                             Modifier.weight(1f), size = 14.sp, lineHeight = 20.sp,
                         )
@@ -223,13 +225,13 @@ fun ConsoleLoginScreen(method: String, nav: Nav) {
                 }
                 "paste" -> PasteKey { accept(it) }
                 "saving" -> Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                    Spinner(40.dp); Spacer(Modifier.height(20.dp)); Txt("Connecting Zen and Go…", size = 18.sp, color = c.textDim)
+                    Spinner(40.dp); Spacer(Modifier.height(20.dp)); Txt(SAcct.connectingZenAndGo, size = 18.sp, color = c.textDim)
                 }
                 "done" -> Done { nav.root(Route.Home) }
                 else -> Column(Modifier.fillMaxSize().padding(32.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                    Txt(error ?: "Something went wrong", size = 17.sp, color = c.danger, align = TextAlign.Center, lineHeight = 24.sp)
+                    Txt(error ?: SAcct.somethingWentWrong, size = 17.sp, color = c.danger, align = TextAlign.Center, lineHeight = 24.sp)
                     Spacer(Modifier.height(20.dp))
-                    BigButton("Try again", filled = false) { stage = if (method.isBlank()) "choose" else "web" }
+                    BigButton(SAcct.tryAgain, filled = false) { stage = if (method.isBlank()) "choose" else "web" }
                 }
             }
         }
@@ -241,7 +243,7 @@ fun ConsoleLoginScreen(method: String, nav: Nav) {
 private fun Steps(at: Int) {
     val c = Oc.c
     Row(verticalAlignment = Alignment.CenterVertically) {
-        listOf("Sign in", "API key", "Done").forEachIndexed { i, t ->
+        listOf(SAcct.signIn, SAcct.apiKey, S.done).forEachIndexed { i, t ->
             if (i > 0) Box(Modifier.padding(horizontal = 8.dp).width(14.dp).height(1.dp).background(c.border))
             Box(Modifier.size(7.dp).clip(CircleShape).background(if (i <= at) c.text else c.border))
             Spacer(Modifier.width(6.dp))
@@ -261,25 +263,25 @@ private fun Choose(onMethod: (String) -> Unit, onPaste: () -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).navigationBarsPadding().padding(horizontal = 22.dp, vertical = 8.dp)) {
         Mark(64.dp)
         Spacer(Modifier.height(20.dp))
-        Heading("Connect OpenCode", size = 30.sp)
+        Heading(SAcct.connectOpenCode, size = 30.sp)
         Spacer(Modifier.height(8.dp))
-        Txt("One account, one key — it unlocks both plans. You pay OpenCode directly; the key stays on this phone.", size = 16.sp, color = c.textDim, lineHeight = 23.sp)
+        Txt(SAcct.oneAccountOneKey, size = 16.sp, color = c.textDim, lineHeight = 23.sp)
         Spacer(Modifier.height(22.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Plan(Modifier.weight(1f), "Zen", "Pay as you go", "Hand-picked top models, checked to work well with the agent.", Ic.Sparkle)
-            Plan(Modifier.weight(1f), "Go", "\$10 / month", "Generous limits on strong open models for everyday coding.", Ic.Zap)
+            Plan(Modifier.weight(1f), "Zen", SAcct.payAsYouGo, SAcct.zenDesc, Ic.Sparkle)
+            Plan(Modifier.weight(1f), "Go", SAcct.goPrice, SAcct.goDesc, Ic.Zap)
         }
         Spacer(Modifier.height(26.dp))
-        Txt("Sign in with", size = 14.sp, color = c.textDim)
+        Txt(SAcct.signInWith, size = 14.sp, color = c.textDim)
         Spacer(Modifier.height(10.dp))
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Method(Ic.GitHub, "GitHub", "Fastest — done inside the app") { onMethod("github") }
-            Method(Ic.Mail, "Email", "A code arrives in your inbox") { onMethod("email") }
+            Method(Ic.GitHub, "GitHub", SAcct.fastestInApp) { onMethod("github") }
+            Method(Ic.Mail, "Email", SAcct.codeArrivesInbox) { onMethod("email") }
         }
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth().clip(Oc.pill).tap(scale = 0.98f, onClick = onPaste).padding(vertical = 14.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
             Ico(Ic.Key, tint = c.textDim, size = 18.dp); Spacer(Modifier.width(8.dp))
-            Txt("I already have an API key", size = 15.sp, color = c.textDim)
+            Txt(SAcct.iHaveApiKey, size = 15.sp, color = c.textDim)
         }
     }
 }
@@ -329,9 +331,9 @@ private fun PasteKey(onKey: (String) -> Unit) {
     var key by remember { mutableStateOf("") }
     val valid = KEY_RE.matches(key.trim())
     Column(Modifier.fillMaxSize().navigationBarsPadding().padding(horizontal = 22.dp)) {
-        Heading("Paste your key", size = 28.sp)
+        Heading(SAcct.pasteYourKey, size = 28.sp)
         Spacer(Modifier.height(8.dp))
-        Txt("Find it in the OpenCode console under API Keys. It starts with “sk-”.", size = 16.sp, color = c.textDim, lineHeight = 23.sp)
+        Txt(SAcct.findKeyInConsole, size = 16.sp, color = c.textDim, lineHeight = 23.sp)
         Spacer(Modifier.height(22.dp))
         Row(
             Modifier.fillMaxWidth().clip(Oc.round(16.dp)).background(c.surface).border(1.dp, if (key.isNotBlank() && !valid) c.danger else c.border, Oc.round(16.dp)).padding(start = 16.dp, end = 6.dp),
@@ -344,15 +346,15 @@ private fun PasteKey(onKey: (String) -> Unit) {
             Box(Modifier.clip(Oc.pill).background(c.surfaceHigh).tap {
                 val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 KEY_RE.find(cm.primaryClip?.getItemAt(0)?.coerceToText(ctx)?.toString().orEmpty())?.let { key = it.value }
-            }.padding(horizontal = 14.dp, vertical = 9.dp)) { Txt("Paste", size = 14.sp) }
+            }.padding(horizontal = 14.dp, vertical = 9.dp)) { Txt(SAcct.paste, size = 14.sp) }
         }
-        if (key.isNotBlank() && !valid) Txt("That doesn't look like an OpenCode key.", Modifier.padding(top = 8.dp), size = 13.sp, color = c.danger)
+        if (key.isNotBlank() && !valid) Txt(SAcct.notOpenCodeKey, Modifier.padding(top = 8.dp), size = 13.sp, color = c.danger)
         Spacer(Modifier.weight(1f))
-        BigButton("Connect", enabled = valid) { onKey(key.trim()) }
+        BigButton(SAcct.connect, enabled = valid) { onKey(key.trim()) }
         Spacer(Modifier.height(10.dp))
         Row(Modifier.fillMaxWidth().clip(Oc.pill).tap(scale = 0.98f) {
             ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(CONSOLE)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        }.padding(vertical = 12.dp), horizontalArrangement = Arrangement.Center) { Txt("Open the console", size = 15.sp, color = c.textDim) }
+        }.padding(vertical = 12.dp), horizontalArrangement = Arrangement.Center) { Txt(SAcct.openConsole, size = 15.sp, color = c.textDim) }
         Spacer(Modifier.height(8.dp))
     }
 }
@@ -373,27 +375,27 @@ private fun Done(onStart: () -> Unit) {
             Ico(Ic.Check, tint = c.bg, size = 44.dp)
         }
         Spacer(Modifier.height(24.dp))
-        Heading("You're connected", size = 30.sp)
+        Heading(SAcct.youreConnected, size = 30.sp)
         Spacer(Modifier.height(8.dp))
-        Txt("Your OpenCode key is saved on this phone.", size = 16.sp, color = c.textDim)
+        Txt(SAcct.keySavedOnPhone, size = 16.sp, color = c.textDim)
         Spacer(Modifier.height(22.dp))
         Column(Modifier.fillMaxWidth().clip(Oc.round(20.dp)).background(c.surface).border(1.dp, c.border, Oc.round(20.dp))) {
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Ico(Ic.Sparkle, tint = c.accent, size = 20.dp); Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) { Txt("Zen", size = 16.sp, weight = FontWeight.Medium); Txt(if (zen > 0) "$zen models · pay as you go" else "Pay as you go", size = 13.sp, color = c.textDim) }
+                Column(Modifier.weight(1f)) { Txt("Zen", size = 16.sp, weight = FontWeight.Medium); Txt(if (zen > 0) SAcct.zenModelsLine(zen) else SAcct.payAsYouGo, size = 13.sp, color = c.textDim) }
                 Ico(Ic.Check, tint = c.ok, size = 18.dp)
             }
             Box(Modifier.fillMaxWidth().height(1.dp).background(c.border))
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Ico(Ic.Zap, tint = c.accent, size = 20.dp); Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) { Txt("Go", size = 16.sp, weight = FontWeight.Medium); Txt(if (go > 0) "$go models · with the Go plan" else "Works with the Go plan", size = 13.sp, color = c.textDim) }
-                Txt("Plan", Modifier.clip(Oc.pill).tap { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://opencode.ai/go")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.padding(horizontal = 10.dp, vertical = 6.dp), size = 14.sp, color = c.accent)
+                Column(Modifier.weight(1f)) { Txt("Go", size = 16.sp, weight = FontWeight.Medium); Txt(if (go > 0) SAcct.goModelsLine(go) else SAcct.worksWithGoPlan, size = 13.sp, color = c.textDim) }
+                Txt(SAcct.plan, Modifier.clip(Oc.pill).tap { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://opencode.ai/go")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.padding(horizontal = 10.dp, vertical = 6.dp), size = 14.sp, color = c.accent)
             }
         }
         Spacer(Modifier.height(10.dp))
-        Txt("Usage limits for Go show up in the circle at the top of a chat.", size = 13.sp, color = c.textDim, lineHeight = 19.sp)
+        Txt(SAcct.goUsageLimitsHint, size = 13.sp, color = c.textDim, lineHeight = 19.sp)
         Spacer(Modifier.weight(1f))
-        BigButton("Start chatting", onClick = onStart)
+        BigButton(SAcct.startChatting, onClick = onStart)
         Spacer(Modifier.height(12.dp))
     }
 }

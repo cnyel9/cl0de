@@ -51,6 +51,8 @@ import com.cl0de.app.api.arr
 import com.cl0de.app.api.long
 import com.cl0de.app.api.str
 import com.cl0de.app.data.ChatMessage
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SChat
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.components.ComposerHost
 import com.cl0de.app.ui.components.Ico
@@ -160,7 +162,7 @@ fun ChatScreen(id: String, nav: Nav, onMenu: () -> Unit) {
     fun beginEdit(m: ChatMessage) { editing = m; state.attachments.clear(); state.text = userText(m) }
     fun retry(m: ChatMessage) {
         val parent = chat.messages.firstOrNull { it.id == m.info.parentID } ?: return
-        scope.launch { runCatching { hub.edit(ctx, id, parent, userText(parent), emptyList()) }.onFailure { hub.toasts.tryEmit(it.message ?: "Retry failed") } }
+        scope.launch { runCatching { hub.edit(ctx, id, parent, userText(parent), emptyList()) }.onFailure { hub.toasts.tryEmit(it.message ?: SChat.retryFailed) } }
     }
 
     // links to environment files (/root/…) open as files, the rest as usual
@@ -168,7 +170,7 @@ fun ChatScreen(id: String, nav: Nav, onMenu: () -> Unit) {
     val uris = remember(sysUri) {
         object : androidx.compose.ui.platform.UriHandler {
             override fun openUri(uri: String) {
-                if (uri.startsWith("/")) com.cl0de.app.ui.components.OutFiles.host(uri)?.let { com.cl0de.app.ui.components.OutFiles.open(ctx, it) } ?: hub.toasts.tryEmit("File not found: $uri")
+                if (uri.startsWith("/")) com.cl0de.app.ui.components.OutFiles.host(uri)?.let { com.cl0de.app.ui.components.OutFiles.open(ctx, it) } ?: hub.toasts.tryEmit(SChat.fileNotFound(uri))
                 else runCatching { sysUri.openUri(uri) }
             }
         }
@@ -187,21 +189,21 @@ fun ChatScreen(id: String, nav: Nav, onMenu: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (incognito) { if (Oc.look.id == "cloud") com.cl0de.app.ui.components.GhostCloud(22.dp, blinks = false) else Ico(Ic.Ghost, tint = c.textDim, size = 18.dp); Spacer(Modifier.width(8.dp)) }
-                Txt(if (incognito) (if (Oc.look.id == "cloud") "Anonymous chat" else "Incognito session") else session?.displayTitle.orEmpty(), size = 15.sp, color = c.textDim, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                Txt(if (incognito) (if (Oc.look.id == "cloud") SChat.anonymousChat else SChat.incognitoSession) else session?.displayTitle.orEmpty(), size = 15.sp, color = c.textDim, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                 if (!incognito) { Spacer(Modifier.width(4.dp)); Ico(Ic.ChevronDown, tint = c.textDim, size = 16.dp) }
             }
             DropdownMenu(menu, { menu = false }, containerColor = c.surface) {
                 val items = listOf(
-                    "Rename" to { rename = true },
-                    (if (id in pinned) "Unpin" else "Pin") to { Graph.prefs.togglePin(id) },
-                    "Changes" to { showDiff = true },
-                    "Fork" to { scope.launch { runCatching { Graph.api.forkSession(id, chat.directory, null) }.getOrNull()?.let { nav.openChat(it.id) } } },
-                    "Compact context" to { scope.launch { runCatching { Graph.api.summarize(id, chat.directory, Graph.prefs.providerId, Graph.prefs.modelId) } } },
-                    "Archive" to { scope.launch { runCatching { Graph.api.archiveSession(id, chat.directory) }; nav.pop() } },
-                    "Delete" to { confirmDelete = true },
+                    S.rename to { rename = true },
+                    (if (id in pinned) SChat.unpin else SChat.pin) to { Graph.prefs.togglePin(id) },
+                    SChat.changes to { showDiff = true },
+                    SChat.fork to { scope.launch { runCatching { Graph.api.forkSession(id, chat.directory, null) }.getOrNull()?.let { nav.openChat(it.id) } } },
+                    SChat.compactContext to { scope.launch { runCatching { Graph.api.summarize(id, chat.directory, Graph.prefs.providerId, Graph.prefs.modelId) } } },
+                    SChat.archive to { scope.launch { runCatching { Graph.api.archiveSession(id, chat.directory) }; nav.pop() } },
+                    S.delete to { confirmDelete = true },
                 )
                 items.forEach { (label, act) ->
-                    DropdownMenuItem(text = { Txt(label, size = 16.sp, color = if (label == "Delete") c.danger else c.text) }, onClick = { menu = false; act() })
+                    DropdownMenuItem(text = { Txt(label, size = 16.sp, color = if (label == S.delete) c.danger else c.text) }, onClick = { menu = false; act() })
                 }
             }
         }
@@ -242,7 +244,7 @@ fun ChatScreen(id: String, nav: Nav, onMenu: () -> Unit) {
                             )
                             // while the agent works you can go play with the mascot
                             if (busy && Oc.look.id == "cloud") Txt(
-                                "Play with Cl0de while you wait ›", size = 13.sp, color = c.textDim,
+                                SChat.playWithCl0de, size = 13.sp, color = c.textDim,
                                 modifier = Modifier.clip(Oc.round(8.dp)).clickable { nav.push(com.cl0de.app.ui.Route.Mascot) }.padding(vertical = 4.dp),
                             )
                             retries[id]?.let { RetryCard(it, nav, onStop = { scope.launch { runCatching { Graph.api.abort(id, chat.directory) } } }) }
@@ -267,7 +269,7 @@ fun ChatScreen(id: String, nav: Nav, onMenu: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Ico(Ic.Edit, tint = c.textDim, size = 18.dp); Spacer(Modifier.width(10.dp))
-                Txt("Editing message — session rewinds to it", size = 14.sp, color = c.textDim, modifier = Modifier.weight(1f))
+                Txt(SChat.editingMessage, size = 14.sp, color = c.textDim, modifier = Modifier.weight(1f))
                 IconBtn(Ic.Close, { editing = null; state.clear() }, size = 40.dp, iconSize = 18.dp)
             }
         }
@@ -284,7 +286,7 @@ fun ChatScreen(id: String, nav: Nav, onMenu: () -> Unit) {
         } else Box(Modifier.navigationBarsPadding()) {
             ComposerHost(
                 state = state, nav = nav, busy = busy || sendingNow, sessionId = id,
-                placeholder = if (sendingNow) "Sending…" else if (editing != null) "Edit your message" else "Reply to ${if (com.cl0de.app.data.Persona.on) "Cl0de" else "OpenCode"}…",
+                placeholder = if (sendingNow) SChat.sending else if (editing != null) SChat.editYourMessage else SChat.replyTo(if (com.cl0de.app.data.Persona.on) "Cl0de" else "OpenCode"),
                 dashed = incognito,
                 onSend = {
                     val text = state.text.trim()
@@ -293,7 +295,7 @@ fun ChatScreen(id: String, nav: Nav, onMenu: () -> Unit) {
                     state.clear(); stick = true; editing = null; sendingNow = true
                     scope.launch {
                         runCatching { if (e != null) hub.edit(ctx, id, e, text, atts) else hub.send(ctx, id, text, atts) }
-                            .onFailure { hub.toasts.tryEmit(it.message ?: "Send failed") }
+                            .onFailure { hub.toasts.tryEmit(it.message ?: SChat.sendFailed) }
                         sendingNow = false
                     }
                 },
@@ -327,16 +329,16 @@ fun ChatScreen(id: String, nav: Nav, onMenu: () -> Unit) {
 
     if (rename) {
         var t by remember { mutableStateOf(session?.title.orEmpty()) }
-        OcDialog("Rename session", { rename = false }, "Save", {
+        OcDialog(SChat.renameSession, { rename = false }, S.save, {
             rename = false
             scope.launch { runCatching { Graph.api.renameSession(id, chat.directory, t) } }
         }) { OcTextField(t, { t = it }) }
     }
     if (confirmDelete) {
-        OcDialog("Delete session?", { confirmDelete = false }, "Delete", {
+        OcDialog(SChat.deleteSessionQ, { confirmDelete = false }, S.delete, {
             confirmDelete = false
             scope.launch { runCatching { Graph.api.deleteSession(id, chat.directory) }; hub.forget(id); hub.refreshSessions(); nav.pop() }
-        }, danger = true) { Txt("This permanently removes the conversation and its history.", size = 16.sp, color = c.textDim) }
+        }, danger = true) { Txt(SChat.deleteSessionBody, size = 16.sp, color = c.textDim) }
     }
     if (showDiff) DiffSheet(id, chat.directory) { showDiff = false }
 }
@@ -357,10 +359,10 @@ private fun DiffSheet(id: String, directory: String?, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     val kept = remember { androidx.compose.runtime.mutableStateMapOf<String, String>() }   // file → keep | undone
     var confirm by remember { mutableStateOf<JsonObject?>(null) }
-    OcSheet(onDismiss, "Changes", skipHalf = false) {
+    OcSheet(onDismiss, SChat.changes, skipHalf = false) {
         val list = files
         if (list == null) Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) { Spinner(28.dp) }
-        else if (list.isEmpty()) Txt("No file changes in this session yet.", color = c.textDim, modifier = Modifier.padding(24.dp))
+        else if (list.isEmpty()) Txt(SChat.noFileChanges, color = c.textDim, modifier = Modifier.padding(24.dp))
         else LazyColumn(Modifier.padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(list) { f ->
                 var open by remember { mutableStateOf(false) }
@@ -375,11 +377,11 @@ private fun DiffSheet(id: String, directory: String?, onDismiss: () -> Unit) {
                     // review: keep or revert (only for the server on the phone, the files are here)
                     val name = f.str("file") ?: ""
                     when (kept[name]) {
-                        "keep" -> Txt("Kept", size = 13.sp, color = c.ok, modifier = Modifier.padding(top = 6.dp, start = 6.dp))
-                        "undone" -> Txt("Undone — the file is back as it was", size = 13.sp, color = c.textDim, modifier = Modifier.padding(top = 6.dp, start = 6.dp))
+                        "keep" -> Txt(SChat.kept, size = 13.sp, color = c.ok, modifier = Modifier.padding(top = 6.dp, start = 6.dp))
+                        "undone" -> Txt(SChat.undoneFileBack, size = 13.sp, color = c.textDim, modifier = Modifier.padding(top = 6.dp, start = 6.dp))
                         else -> if (!Graph.devices.isRemote) Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            com.cl0de.app.ui.components.SmallButton("Keep", { kept[name] = "keep" }, filled = true)
-                            com.cl0de.app.ui.components.SmallButton("Undo", { confirm = f })
+                            com.cl0de.app.ui.components.SmallButton(SChat.keep, { kept[name] = "keep" }, filled = true)
+                            com.cl0de.app.ui.components.SmallButton(SChat.undo, { confirm = f })
                         }
                     }
                 }
@@ -388,15 +390,15 @@ private fun DiffSheet(id: String, directory: String?, onDismiss: () -> Unit) {
     }
     confirm?.let { f ->
         val name = f.str("file") ?: ""
-        OcDialog("Undo changes to ${name.substringAfterLast('/')}?", { confirm = null }, "Undo", {
+        OcDialog(SChat.undoChangesTo(name.substringAfterLast('/')), { confirm = null }, SChat.undo, {
             confirm = null
             scope.launch {
                 com.cl0de.app.data.Review.undo(directory, name, f.str("before"), f.str("patch"))
                     .onSuccess { kept[name] = "undone" }
-                    .onFailure { Graph.chats.toasts.tryEmit(it.message ?: "Couldn't undo") }
+                    .onFailure { Graph.chats.toasts.tryEmit(it.message ?: SChat.couldntUndo) }
             }
         }, danger = true) {
-            Txt("The file goes back to how it was before the agent changed it in this chat. The agent won't know unless you tell it.", size = 15.sp, color = c.textDim, lineHeight = 21.sp)
+            Txt(SChat.undoExplain, size = 15.sp, color = c.textDim, lineHeight = 21.sp)
         }
     }
 }
@@ -408,12 +410,12 @@ private fun RetryCard(r: com.cl0de.app.data.RetryInfo, nav: Nav, onStop: () -> U
     Column(Modifier.fillMaxWidth().padding(top = 12.dp).clip(Oc.round(22.dp)).background(c.surface).border(1.dp, c.border, Oc.round(22.dp)).padding(18.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Ico(Ic.Warning, tint = c.warn, size = 22.dp); Spacer(Modifier.width(10.dp))
-            Txt(r.title ?: "The provider is not answering", size = 16.sp, weight = androidx.compose.ui.text.font.FontWeight.Medium)
+            Txt(r.title ?: SChat.providerNotAnswering, size = 16.sp, weight = androidx.compose.ui.text.font.FontWeight.Medium)
         }
         Txt(r.message, size = 15.sp, color = c.textDim, modifier = Modifier.padding(top = 8.dp), lineHeight = 21.sp)
         if (r.message.contains("Free usage", ignoreCase = true)) {
             Txt(
-                "The built-in free models are capped by OpenCode's server. The reset is not always applied, so waiting may not help. Switch to another free model below.",
+                SChat.freeUsageExplain,
                 size = 14.sp, color = c.textDim, modifier = Modifier.padding(top = 8.dp), lineHeight = 20.sp,
             )
         }
@@ -422,19 +424,19 @@ private fun RetryCard(r: com.cl0de.app.data.RetryInfo, nav: Nav, onStop: () -> U
             androidx.compose.runtime.LaunchedEffect(at) { while (left > 0) { kotlinx.coroutines.delay(1000); left = at - System.currentTimeMillis() } }
             if (left > 0) {
                 val m = left / 60000
-                Txt("Next attempt in " + (if (m >= 60) "${m / 60} h ${m % 60} min" else if (m >= 1) "$m min" else "${left / 1000} s"), size = 14.sp, color = c.text, modifier = Modifier.padding(top = 8.dp))
+                Txt(SChat.nextAttemptIn(m, left), size = 14.sp, color = c.text, modifier = Modifier.padding(top = 8.dp))
             }
         }
         @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
         androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (r.message.contains("Free usage", ignoreCase = true)) {
                 val scope = androidx.compose.runtime.rememberCoroutineScope()
-                com.cl0de.app.ui.components.SmallButton("Free options", { nav.push(com.cl0de.app.ui.Route.Login) }, filled = true)
-                com.cl0de.app.ui.components.SmallButton("No account", { scope.launch { runCatching { com.cl0de.app.data.FreeModels.enablePollinations() }; Graph.chats.toasts.tryEmit("Switched to GPT-OSS 20B (Pollinations). Send again.") } })
-            } else com.cl0de.app.ui.components.SmallButton("Connect provider", { nav.push(com.cl0de.app.ui.Route.Providers) }, filled = true)
-            r.link?.let { l -> com.cl0de.app.ui.components.SmallButton(r.label?.replaceFirstChar { it.uppercase() } ?: "Open", { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(l)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }) }
+                com.cl0de.app.ui.components.SmallButton(SChat.freeOptions, { nav.push(com.cl0de.app.ui.Route.Login) }, filled = true)
+                com.cl0de.app.ui.components.SmallButton(SChat.noAccount, { scope.launch { runCatching { com.cl0de.app.data.FreeModels.enablePollinations() }; Graph.chats.toasts.tryEmit(SChat.switchedPollinations) } })
+            } else com.cl0de.app.ui.components.SmallButton(SChat.connectProvider, { nav.push(com.cl0de.app.ui.Route.Providers) }, filled = true)
+            r.link?.let { l -> com.cl0de.app.ui.components.SmallButton(r.label?.replaceFirstChar { it.uppercase() } ?: SChat.openAction, { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(l)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }) }
         }
-        com.cl0de.app.ui.components.SmallButton("Stop", onStop, Modifier.padding(top = 10.dp).fillMaxWidth(), filled = true, danger = true)
+        com.cl0de.app.ui.components.SmallButton(S.stop, onStop, Modifier.padding(top = 10.dp).fillMaxWidth(), filled = true, danger = true)
     }
 }
 

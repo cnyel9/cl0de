@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.cl0de.app.Graph
+import com.cl0de.app.data.SChat
 import com.cl0de.app.data.Chat
 import com.cl0de.app.data.ContextInfo
 import com.cl0de.app.data.ContextUsage
@@ -149,12 +150,7 @@ private fun k(n: Long) = when {
 
 private fun money(x: Double) = if (x >= 100) "$%.0f".format(java.util.Locale.US, x) else "$%.2f".format(java.util.Locale.US, x)
 
-private fun resets(w: UsageWindow): String {
-    val at = w.resetAt ?: return "No usage yet"
-    if (at <= System.currentTimeMillis()) return "Resetting now"
-    val soon = at - System.currentTimeMillis() < 24 * 3600_000L
-    return "Resets " + java.text.SimpleDateFormat(if (soon) "'at' h:mm a" else "EEE h:mm a", java.util.Locale.ENGLISH).format(java.util.Date(at))
-}
+private fun resets(w: UsageWindow): String = SChat.resetLabel(w.resetAt)
 
 /** Colors of the context slices: flat, no glow. */
 @Composable
@@ -209,8 +205,8 @@ private fun UsagePanel(chat: Chat?, nav: Nav, onDismiss: () -> Unit) {
         val tools = ContextUsage.tools(pid, mid, chat.directory)
         ctx = ContextUsage.compute(chat.messages.toList(), tools, window, chat.directory)
     }
-    val plan = if (prefs.limitProviders.contains("opencode-go")) "OpenCode Go" else "Your limits"
-    val windows = listOf("5-hour limit" to snap.fiveHour, "Weekly · all models" to snap.week, "Monthly" to snap.month)
+    val plan = if (prefs.limitProviders.contains("opencode-go")) "OpenCode Go" else SChat.yourLimits
+    val windows = listOf(SChat.fiveHourLimit to snap.fiveHour, SChat.weeklyAllModels to snap.week, SChat.monthlyLabel to snap.month)
 
     val shape: Shape = when (look) {
         "terminal" -> RectangleShape
@@ -243,12 +239,12 @@ private fun UsagePanel(chat: Chat?, nav: Nav, onDismiss: () -> Unit) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         when (look) {
                             "terminal" -> Txt("$ usage --limits", Modifier.weight(1f), size = 13.sp, family = Oc.mono, color = c.textDim)
-                            "kimi", "cloud" -> Txt("Usage", Modifier.weight(1f), size = 20.sp, weight = FontWeight.SemiBold)
-                            "notebook" -> androidx.compose.material3.Text("Usage so far", Modifier.weight(1f), fontSize = 20.sp, fontFamily = Oc.reply, fontStyle = FontStyle.Italic, color = c.text)
-                            "claude" -> Heading("Usage", Modifier.weight(1f), size = 20.sp)
-                            else -> Label("Plan usage limits · $plan", Modifier.weight(1f), size = 14.sp, color = c.textDim)
+                            "kimi", "cloud" -> Txt(SChat.usageTitle, Modifier.weight(1f), size = 20.sp, weight = FontWeight.SemiBold)
+                            "notebook" -> androidx.compose.material3.Text(SChat.usageSoFar, Modifier.weight(1f), fontSize = 20.sp, fontFamily = Oc.reply, fontStyle = FontStyle.Italic, color = c.text)
+                            "claude" -> Heading(SChat.usageTitle, Modifier.weight(1f), size = 20.sp)
+                            else -> Label(SChat.planUsageLimits(plan), Modifier.weight(1f), size = 14.sp, color = c.textDim)
                         }
-                        Label(if (look == "terminal") "all →" else "See all →", Modifier.clip(CircleShape).tap { onDismiss(); nav.push(Route.Usage) }.padding(6.dp), size = 14.sp)
+                        Label(if (look == "terminal") SChat.allArrow else SChat.seeAll, Modifier.clip(CircleShape).tap { onDismiss(); nav.push(Route.Usage) }.padding(6.dp), size = 14.sp)
                     }
                     if (look.kimiLike || look == "claude" || look == "notebook") Label(plan, size = 13.sp, color = c.textDim)
                     Spacer(Modifier.height(14.dp))
@@ -302,7 +298,7 @@ private fun LimitRow(label: String, w: UsageWindow) {
     if (look == "terminal") {
         val n = 18; val filled = (f * n).toInt()
         Txt("%-8s".format(label.substringBefore(" ").replace("-hour", "h").lowercase()) + "█".repeat(filled) + "░".repeat(n - filled) + "  %3d%%".format((f * 100).toInt()), size = 13.sp, family = Oc.mono, color = col, maxLines = 1)
-        Txt("        ${money(w.used)} of ${money(w.limit)} · ${resets(w).lowercase()}", size = 12.sp, family = Oc.mono, color = c.textDim, maxLines = 1)
+        Txt("        " + SChat.usedOf(money(w.used), money(w.limit)) + " · " + resets(w).lowercase(), size = 12.sp, family = Oc.mono, color = c.textDim, maxLines = 1)
         return
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -318,7 +314,7 @@ private fun LimitRow(label: String, w: UsageWindow) {
         if (f > 0.004f) Box(Modifier.fillMaxWidth(f.coerceAtMost(1f)).height(h).clip(shape).background(col))
     }
     Spacer(Modifier.height(5.dp))
-    Label("${money(w.used)} of ${money(w.limit)}", size = 12.sp, color = c.textDim)
+    Label(SChat.usedOf(money(w.used), money(w.limit)), size = 12.sp, color = c.textDim)
 }
 
 /** Kimi: three rings side by side: 5 h, week, month. */
@@ -345,17 +341,17 @@ private fun ContextBlock(chat: Chat?, ctx: ContextInfo?) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         when (look) {
             "terminal" -> Txt("$ context", Modifier.weight(1f), size = 13.sp, family = Oc.mono, color = c.textDim)
-            "claude" -> Heading("Context", Modifier.weight(1f), size = 18.sp)
-            "kimi", "cloud" -> Txt("Context", Modifier.weight(1f), size = 18.sp, weight = FontWeight.SemiBold)
-            else -> Label("Context window", Modifier.weight(1f), size = 14.sp, color = c.textDim)
+            "claude" -> Heading(SChat.contextTitle, Modifier.weight(1f), size = 18.sp)
+            "kimi", "cloud" -> Txt(SChat.contextTitle, Modifier.weight(1f), size = 18.sp, weight = FontWeight.SemiBold)
+            else -> Label(SChat.contextWindow, Modifier.weight(1f), size = 14.sp, color = c.textDim)
         }
         if (ctx != null && ctx.window > 0) Label("${k(ctx.used)} / ${k(ctx.window)} · ${(ctx.fraction * 100).toInt()}%", size = 13.sp, color = c.textDim)
     }
     Spacer(Modifier.height(12.dp))
     when {
-        chat == null -> { Label("Open a chat to see what fills its context.", size = 14.sp, color = c.textDim); return }
-        ctx == null -> { Label("Counting…", size = 14.sp, color = c.textDim); return }
-        ctx.window <= 0 -> { Label("This model doesn't report its window size.", size = 14.sp, color = c.textDim); return }
+        chat == null -> { Label(SChat.openChatToSee, size = 14.sp, color = c.textDim); return }
+        ctx == null -> { Label(SChat.counting, size = 14.sp, color = c.textDim); return }
+        ctx.window <= 0 -> { Label(SChat.noWindowSize, size = 14.sp, color = c.textDim); return }
     }
     ctx!!
     // slices in order: used, free, auto-compaction headroom (at the end, like in Claude Code)
@@ -370,7 +366,7 @@ private fun ContextBlock(chat: Chat?, ctx: ContextInfo?) {
     val colors = (ctx.parts.map { it.key } + listOf("free", "buffer")).associateWith { partColor(it) }
     ContextGrid(cells, colors)
     Spacer(Modifier.height(14.dp))
-    val rows = ctx.parts.map { Triple(it.key, it.label, it.tokens) } + listOf(Triple("free", "Free space", ctx.free), Triple("buffer", "Autocompact buffer", ctx.buffer))
+    val rows = ctx.parts.map { Triple(it.key, it.label, it.tokens) } + listOf(Triple("free", SChat.freeSpace, ctx.free), Triple("buffer", SChat.autocompactBuffer, ctx.buffer))
     rows.forEach { (key, label, t) ->
         Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Marker(colors.getValue(key), key == "free")
@@ -381,7 +377,7 @@ private fun ContextBlock(chat: Chat?, ctx: ContextInfo?) {
             Label("%.1f%%".format(java.util.Locale.US, t * 100.0 / ctx.window), Modifier.width(52.dp), size = 13.sp, color = c.textDim, align = TextAlign.End)
         }
     }
-    if (!ctx.measured) { Spacer(Modifier.height(6.dp)); Label("Estimated until the first reply comes in.", size = 12.sp, color = c.textDim) }
+    if (!ctx.measured) { Spacer(Modifier.height(6.dp)); Label(SChat.estimatedNote, size = 12.sp, color = c.textDim) }
 }
 
 /** Slice icon in the legend: shaped like this look's grid cell. */
@@ -438,17 +434,17 @@ private fun ChatStats(ctx: ContextInfo?) {
     val c = Oc.c
     val look = Oc.look.id
     val stats = listOf(
-        "Messages" to (ctx?.let { "${it.messages}" } ?: "–"),
-        "Spent" to (ctx?.let { money(it.cost) } ?: "–"),
-        "Tokens in" to (ctx?.let { k(it.tokensIn) } ?: "–"),
-        "Tokens out" to (ctx?.let { k(it.tokensOut) } ?: "–"),
+        SChat.statMessages to (ctx?.let { "${it.messages}" } ?: "–"),
+        SChat.statSpent to (ctx?.let { money(it.cost) } ?: "–"),
+        SChat.statTokensIn to (ctx?.let { k(it.tokensIn) } ?: "–"),
+        SChat.statTokensOut to (ctx?.let { k(it.tokensOut) } ?: "–"),
     )
     when (look) {
         "terminal", "hairline" -> stats.forEach { (l, v) ->
             Row(Modifier.padding(vertical = 3.dp)) { Label(l, Modifier.weight(1f), size = 14.sp, color = c.textDim); Label(v, size = 14.sp) }
         }
         else -> {
-            Label("This chat", size = 14.sp, color = c.textDim)
+            Label(SChat.thisChat, size = 14.sp, color = c.textDim)
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 stats.forEach { (l, v) ->
@@ -462,7 +458,7 @@ private fun ChatStats(ctx: ContextInfo?) {
                     }
                 }
             }
-            if (ctx != null && ctx.yours > 0) { Spacer(Modifier.height(8.dp)); Label("${ctx.yours} from you, ${ctx.messages - ctx.yours} from OpenCode", size = 12.sp, color = c.textDim) }
+            if (ctx != null && ctx.yours > 0) { Spacer(Modifier.height(8.dp)); Label(SChat.yoursLine(ctx.yours, ctx.messages), size = 12.sp, color = c.textDim) }
         }
     }
 }

@@ -41,6 +41,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SAcct
 import com.cl0de.app.ui.components.tap
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.Route
@@ -58,11 +60,11 @@ import kotlinx.coroutines.launch
 fun ago(ms: Long): String {
     val d = (System.currentTimeMillis() - ms) / 1000
     return when {
-        d < 60 -> "just now"
-        d < 3600 -> "${d / 60} minute${if (d / 60 == 1L) "" else "s"} ago"
-        d < 86400 -> "${d / 3600} hour${if (d / 3600 == 1L) "" else "s"} ago"
-        d < 172800 -> "Yesterday"
-        else -> "${d / 86400} days ago"
+        d < 60 -> SAcct.justNow
+        d < 3600 -> SAcct.minutesAgo(d / 60)
+        d < 86400 -> SAcct.hoursAgo(d / 3600)
+        d < 172800 -> S.yesterday
+        else -> SAcct.daysAgo(d / 86400)
     }
 }
 
@@ -106,7 +108,7 @@ fun RecentsScreen(nav: Nav, onMenu: () -> Unit) {
     Box(Modifier.fillMaxSize().screenBackdrop("RecentsScreen1")) {
         Column(Modifier.fillMaxSize()) {
             TopBar(
-                "Recents",
+                SAcct.recents,
                 left = { if (selecting) IconBtn(Ic.Back, { selecting = false; selected.clear() }) else IconBtn(Ic.Menu, onMenu) },
                 right = {
                     if (selecting) IconBtn(Ic.Trash, { if (selected.isNotEmpty()) confirm = true }, tint = if (selected.isEmpty()) c.textDim else c.text)
@@ -114,7 +116,7 @@ fun RecentsScreen(nav: Nav, onMenu: () -> Unit) {
                         Box {
                             IconBtn(Ic.Sliders, { filterMenu = true })
                             DropdownMenu(filterMenu, { filterMenu = false }, containerColor = c.surface) {
-                                listOf("all" to "All", "pinned" to "Pinned", "working" to "Working", "input" to "Needs input").forEach { (k, l) ->
+                                listOf("all" to S.all, "pinned" to SAcct.pinned, "working" to SAcct.working, "input" to SAcct.needsInput).forEach { (k, l) ->
                                     DropdownMenuItem(
                                         text = { Txt(l, size = 17.sp, color = if (filter == k) c.link else c.text) },
                                         onClick = { filter = k; filterMenu = false },
@@ -148,11 +150,11 @@ fun RecentsScreen(nav: Nav, onMenu: () -> Unit) {
             ) {
                 Ico(Ic.Search, tint = c.textDim, size = 24.dp); Spacer(Modifier.width(12.dp))
                 Box(Modifier.weight(1f)) {
-                    if (query.isEmpty()) Txt("Search chats and memory", size = 18.sp, color = c.textDim)
+                    if (query.isEmpty()) Txt(SAcct.searchChatsAndMemory, size = 18.sp, color = c.textDim)
                     BasicTextField(query, { query = it }, singleLine = true, textStyle = TextStyle(color = c.text, fontSize = 18.sp), cursorBrush = SolidColor(c.text), modifier = Modifier.fillMaxWidth().focusRequester(focus))
                 }
             }
-            if (list.isEmpty() && hits.isEmpty() && memHits.isEmpty()) EmptyState(Ic.Code, "Nothing here", if (sessions.isEmpty()) "Start a session and it will show up here." else "No sessions match this filter.", Modifier.padding(top = 60.dp))
+            if (list.isEmpty() && hits.isEmpty() && memHits.isEmpty()) EmptyState(Ic.Code, SAcct.nothingHere, if (sessions.isEmpty()) SAcct.startSessionHint else SAcct.noSessionsMatchFilter, Modifier.padding(top = 60.dp))
             LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 8.dp, bottom = 120.dp)) {
                 items(list, key = { it.id }) { s ->
                     var actions by remember { mutableStateOf(false) }
@@ -179,17 +181,17 @@ fun RecentsScreen(nav: Nav, onMenu: () -> Unit) {
                     }
                 }
                 if (hits.isNotEmpty()) {
-                    item(key = "h-msg") { com.cl0de.app.ui.components.SectionLabel("In messages") }
+                    item(key = "h-msg") { com.cl0de.app.ui.components.SectionLabel(SAcct.inMessages) }
                     items(hits.size, key = { "m$it" }) { i ->
                         val h = hits[i]
                         Column(Modifier.fillMaxWidth().tap(scale = 1f) { nav.openChat(h.sessionId) }.padding(horizontal = 20.dp, vertical = 11.dp)) {
-                            Txt(h.title.ifBlank { "Untitled" } + " · " + ago(h.time), size = 14.sp, color = c.textDim, maxLines = 1)
-                            Txt((if (h.user) "You: " else "") + h.snippet, size = 16.sp, maxLines = 3, lineHeight = 22.sp)
+                            Txt(h.title.ifBlank { SAcct.untitled } + " · " + ago(h.time), size = 14.sp, color = c.textDim, maxLines = 1)
+                            Txt((if (h.user) SAcct.youPrefix else "") + h.snippet, size = 16.sp, maxLines = 3, lineHeight = 22.sp)
                         }
                     }
                 }
                 if (memHits.isNotEmpty()) {
-                    item(key = "h-mem") { com.cl0de.app.ui.components.SectionLabel("In memory") }
+                    item(key = "h-mem") { com.cl0de.app.ui.components.SectionLabel(SAcct.inMemory) }
                     items(memHits.size, key = { "k$it" }) { i ->
                         val h = memHits[i]
                         Column(Modifier.fillMaxWidth().tap(scale = 1f) { nav.push(Route.Memory) }.padding(horizontal = 20.dp, vertical = 11.dp)) {
@@ -200,15 +202,15 @@ fun RecentsScreen(nav: Nav, onMenu: () -> Unit) {
                 }
             }
         }
-        Box(Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(16.dp)) { Pill("New session", { nav.root(Route.Home) }, icon = Ic.Plus) }
+        Box(Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(16.dp)) { Pill(SAcct.newSession, { nav.root(Route.Home) }, icon = Ic.Plus) }
     }
     if (confirm) {
-        OcDialog("Delete ${selected.size} session${if (selected.size == 1) "" else "s"}?", { confirm = false }, "Delete", {
+        OcDialog(SAcct.deleteSessions(selected.size), { confirm = false }, S.delete, {
             val ids = selected.toList(); confirm = false; selecting = false; selected.clear()
             scope.launch {
                 ids.forEach { id -> runCatching { Graph.api.deleteSession(id, Graph.chats.session(id)?.directory) }; Graph.chats.forget(id) }
                 Graph.chats.refreshSessions()
             }
-        }, danger = true) { Txt("This cannot be undone.", size = 16.sp, color = c.textDim) }
+        }, danger = true) { Txt(SAcct.cannotBeUndone, size = 16.sp, color = c.textDim) }
     }
 }

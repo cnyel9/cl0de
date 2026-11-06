@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import com.cl0de.app.Graph
+import com.cl0de.app.data.SSet
 import com.cl0de.app.runtime.RuntimeState
 import com.cl0de.app.ui.components.Spinner
 import com.cl0de.app.ui.components.Txt
@@ -242,9 +243,9 @@ private fun ConnectPrompt(nav: Nav) {
     var busy by remember(o) { mutableStateOf(false) }
     var error by remember(o) { mutableStateOf<String?>(null) }
     com.cl0de.app.ui.components.OcDialog(
-        "Connect to ${o.name.ifBlank { "this computer" }}?",
+        SSet.connectTo(o.name.ifBlank { SSet.thisComputer }),
         onDismiss = { if (!busy) com.cl0de.app.data.ConnectLink.pending = null },
-        confirmText = if (busy) "Connecting…" else "Connect",
+        confirmText = if (busy) SSet.connecting else SSet.connect,
         onConfirm = {
             if (busy) return@OcDialog
             busy = true; error = null
@@ -253,15 +254,15 @@ private fun ConnectPrompt(nav: Nav) {
                     com.cl0de.app.data.ConnectLink.accept(o)
                     com.cl0de.app.data.ConnectLink.pending = null
                     nav.root(Route.Code)
-                    Graph.chats.toasts.tryEmit("Connected to ${o.name.ifBlank { "your computer" }}")
+                    Graph.chats.toasts.tryEmit(SSet.connectedTo(o.name.ifBlank { SSet.yourComputer }))
                 } catch (e: Exception) {
-                    error = e.message?.takeIf { it.isNotBlank() } ?: "Can't reach the computer"
+                    error = e.message?.takeIf { it.isNotBlank() } ?: SSet.cantReachComputer
                 } finally { busy = false }
             }
         },
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Txt("OpenCode on it will work from this phone: chats, code and files.", size = 15.sp, color = c.textDim, lineHeight = 21.sp)
+            Txt(SSet.openCodeOnIt, size = 15.sp, color = c.textDim, lineHeight = 21.sp)
             Txt(o.url, size = 13.sp, family = Oc.mono, color = c.textDim)
             error?.let { Txt(it, size = 14.sp, color = c.danger) }
         }
@@ -282,10 +283,10 @@ private fun ServerBanner(rt: RuntimeState) {
                     .clickable(enabled = remoteId.isEmpty() && rt !is RuntimeState.Starting) { Graph.runtime.startServer() }.padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (remoteId.isNotEmpty()) Txt("Can't reach ${Graph.devices.active()?.name ?: "device"}…", size = 14.sp, color = c.warn) else when (rt) {
-                    is RuntimeState.Starting -> { Spinner(16.dp, stroke = 2.dp); Spacer(Modifier.width(10.dp)); Txt("Starting local server…", size = 14.sp) }
-                    is RuntimeState.Crashed -> Txt("Server crashed — tap to restart", size = 14.sp, color = c.danger)
-                    else -> Txt("Server stopped — tap to start", size = 14.sp, color = c.textDim)
+                if (remoteId.isNotEmpty()) Txt(SSet.cantReachDevice(Graph.devices.active()?.name ?: SSet.device), size = 14.sp, color = c.warn) else when (rt) {
+                    is RuntimeState.Starting -> { Spinner(16.dp, stroke = 2.dp); Spacer(Modifier.width(10.dp)); Txt(SSet.startingLocalServer, size = 14.sp) }
+                    is RuntimeState.Crashed -> Txt(SSet.serverCrashedTapRestart, size = 14.sp, color = c.danger)
+                    else -> Txt(SSet.serverStoppedTapStart, size = 14.sp, color = c.textDim)
                 }
             }
         }

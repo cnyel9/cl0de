@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
+import com.cl0de.app.data.SMisc
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.components.IconBtn
 import com.cl0de.app.ui.components.TopBar
@@ -55,7 +56,7 @@ import com.cl0de.app.ui.theme.UnboundedFamily
 fun EditionScreen(nav: Nav) {
     val c = Oc.c
     Column(Modifier.fillMaxSize().screenBackdrop("EditionScreen1")) {
-        TopBar("Interface", left = { IconBtn(Ic.Back, { nav.pop() }) })
+        TopBar(SMisc.interfaceLabel, left = { IconBtn(Ic.Back, { nav.pop() }) })
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             // two columns: several looks side by side at once
             Looks.all.chunked(2).forEach { row ->
@@ -79,19 +80,19 @@ fun EditionScreen(nav: Nav) {
                     if (row.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
-            Txt("Colors, fonts and corners switch right away. Light and dark mode work in every interface.", Modifier.padding(horizontal = 6.dp, vertical = 6.dp), size = 13.sp, color = c.textDim, lineHeight = 19.sp)
+            Txt(SMisc.editionFooter, Modifier.padding(horizontal = 6.dp, vertical = 6.dp), size = 13.sp, color = c.textDim, lineHeight = 19.sp)
             // intro animation and icon for the chosen look
             val ctx = androidx.compose.ui.platform.LocalContext.current
             var intro by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(Graph.prefs.introEnabled) }
             val match = com.cl0de.app.ui.theme.AppIcons.all.firstOrNull { it.id == "look_" + Graph.prefs.edition }
             com.cl0de.app.ui.components.SettingsGroup(Modifier.padding(top = 4.dp)) {
-                com.cl0de.app.ui.components.SettingsRow("Launch animation", subtitle = "Plays when the app starts; tap to skip", icon = Ic.Play, trailing = {
+                com.cl0de.app.ui.components.SettingsRow(SMisc.launchAnimation, subtitle = SMisc.launchAnimationSub, icon = Ic.Play, trailing = {
                     com.cl0de.app.ui.components.OcSwitch(intro) { intro = it; Graph.prefs.introEnabled = it }
                 })
-                com.cl0de.app.ui.components.SettingsRow("Play it now", icon = Ic.Sparkle, onClick = { com.cl0de.app.ui.components.Intro.replay.intValue++ })
+                com.cl0de.app.ui.components.SettingsRow(SMisc.playItNow, icon = Ic.Sparkle, onClick = { com.cl0de.app.ui.components.Intro.replay.intValue++ })
                 if (match != null) com.cl0de.app.ui.components.SettingsRow(
-                    if (Graph.prefs.appIcon == match.id) "Icon matches this interface" else "Use the ${match.label} icon",
-                    subtitle = "Any icon can still be picked in Settings → App icon", icon = Ic.Image,
+                    if (Graph.prefs.appIcon == match.id) SMisc.iconMatches else SMisc.useLookIcon(match.label),
+                    subtitle = SMisc.anyIconSettings, icon = Ic.Image,
                     onClick = { Graph.prefs.appIcon = match.id; com.cl0de.app.ui.theme.AppIcons.apply(ctx, match.id) },
                 )
             }
@@ -112,9 +113,9 @@ internal fun LookPreview(l: Look) {
             Column {
                 Txt(if (l.id == "terminal") "opencode" else "OpenCode", size = 14.sp, color = p.text, family = head, weight = if (l.id == "hairline" || l.id == "terminal") FontWeight.Bold else null)
                 Spacer(Modifier.height(6.dp))
-                val msg = "make it blue"
+                val msg = SMisc.makeItBlue
                 when (l.user) {
-                    "plain" -> Txt("You — $msg", size = 10.sp, color = p.textDim, family = font)
+                    "plain" -> Txt(SMisc.youMessage(msg), size = 10.sp, color = p.textDim, family = font)
                     "line" -> Box(Modifier.align(Alignment.End).border(1.dp, p.border, r(10.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) { Txt(msg, size = 10.sp, color = p.text, family = font) }
                     "card" -> Box(Modifier.align(Alignment.End).clip(r(10.dp)).background(p.surface).border(1.dp, p.border, r(10.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) { Txt(msg, size = 10.sp, color = p.text, family = font) }
                     else -> if (l.id == "terminal") Row(Modifier.fillMaxWidth().height(22.dp).background(p.surface)) {
@@ -122,7 +123,7 @@ internal fun LookPreview(l: Look) {
                     } else Box(Modifier.align(Alignment.End).clip(r(12.dp)).background(p.userBubble).padding(horizontal = 8.dp, vertical = 4.dp)) { Txt(msg, size = 10.sp, color = p.text, family = font) }
                 }
                 Spacer(Modifier.height(5.dp))
-                val ans = "Done — the button is blue."
+                val ans = SMisc.doneButtonBlue
                 when (l.reply) {
                     "bubble" -> Box(Modifier.clip(r(12.dp)).background(p.surface).padding(horizontal = 8.dp, vertical = 4.dp)) { Txt(ans, size = 10.sp, color = p.text, family = font) }
                     "card" -> Box(Modifier.fillMaxWidth().clip(r(10.dp)).background(p.surface).border(1.dp, p.border, r(10.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) { Txt(ans, size = 10.sp, color = p.text, family = font) }
@@ -133,7 +134,7 @@ internal fun LookPreview(l: Look) {
                 Modifier.fillMaxWidth().height(28.dp).clip(if (l.compact || l.id == "claude") RoundedCornerShape(50) else r(12.dp)).background(p.surface).border(1.dp, p.border, if (l.compact || l.id == "claude") RoundedCornerShape(50) else r(12.dp)).padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Txt(if (l.id == "terminal") "Build · pickle" else "Ask anything", size = 10.sp, color = p.textDim, family = font, maxLines = 1)
+                Txt(if (l.id == "terminal") "Build · pickle" else SMisc.askAnything, size = 10.sp, color = p.textDim, family = font, maxLines = 1)
                 Spacer(Modifier.weight(1f))
                 Box(Modifier.size(18.dp).clip(if (l.pill != null || l.frame != "claude") r(5.dp) else CircleShape).background(send))
             }

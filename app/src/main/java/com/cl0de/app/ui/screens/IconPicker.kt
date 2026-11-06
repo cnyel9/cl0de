@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
+import com.cl0de.app.data.SMisc
 import com.cl0de.app.ui.components.OcSheet
 import com.cl0de.app.ui.components.Txt
 import com.cl0de.app.ui.theme.AppIcon
@@ -36,7 +37,7 @@ import com.cl0de.app.ui.theme.Oc
 fun IconPickerSheet(onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     val c = Oc.c
-    OcSheet(onDismiss, "App icon", skipHalf = false) {
+    OcSheet(onDismiss, SMisc.appIcon, skipHalf = false) {
         LazyVerticalGrid(
             GridCells.Fixed(3), Modifier.padding(horizontal = 12.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -57,6 +58,6 @@ fun IconPickerSheet(onDismiss: () -> Unit) {
                 }
             }
         }
-        Txt("The launcher may take a few seconds to refresh the icon.", size = 13.sp, color = c.textDim, modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 16.dp))
+        Txt(SMisc.iconRefreshNote, size = 13.sp, color = c.textDim, modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 16.dp))
     }
 }

@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
 import com.cl0de.app.data.Backup
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SSet
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.components.IconBtn
 import com.cl0de.app.ui.components.OcDialog
@@ -53,38 +55,38 @@ fun BackupScreen(nav: Nav) {
     val busy = st is Backup.State.Working
 
     Column(Modifier.fillMaxSize().screenBackdrop("BackupScreen1")) {
-        TopBar("Backup & move", left = { IconBtn(Ic.Back, { if (!busy) nav.pop() }) })
+        TopBar(SSet.backupAndMove, left = { IconBtn(Ic.Back, { if (!busy) nav.pop() }) })
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding().padding(bottom = 32.dp)) {
             Txt(
-                "One file with everything: chats, sign-ins, memory, skills, projects, GitHub and your settings. Restore it on another phone or after reinstalling.",
+                SSet.backupIntro,
                 Modifier.padding(horizontal = 20.dp).padding(bottom = 14.dp), size = 15.sp, color = c.textDim, lineHeight = 21.sp,
             )
             SettingsGroup {
-                SettingsRow("Back up everything", subtitle = "Saved to Downloads/OpenCode", icon = Ic.Download,
+                SettingsRow(SSet.backUpEverything, subtitle = SSet.savedToDownloads, icon = Ic.Download,
                     onClick = { if (!busy && !Graph.devices.isRemote) scope.launch { Backup.export(ctx) } })
-                SettingsRow("Restore from a backup", subtitle = "Replaces what is here now", icon = Ic.Undo,
+                SettingsRow(SSet.restoreFromBackup, subtitle = SSet.replacesCurrent, icon = Ic.Undo,
                     onClick = { if (!busy) picker.launch(arrayOf("*/*")) })
             }
-            if (Graph.devices.isRemote) Txt("Backups cover the server on this phone. Switch to it first.", Modifier.padding(20.dp), size = 14.sp, color = c.textDim)
+            if (Graph.devices.isRemote) Txt(SSet.backupsCoverServer, Modifier.padding(20.dp), size = 14.sp, color = c.textDim)
             when (val s = st) {
                 is Backup.State.Working -> Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
                     Spinner(18.dp); Spacer(Modifier.width(12.dp)); Txt(s.step + "…", size = 15.sp)
                 }
                 is Backup.State.Saved -> {
-                    SectionLabel("Done")
+                    SectionLabel(S.done)
                     Txt("${s.where} · ${"%.1f".format(java.util.Locale.US, s.bytes / 1048576.0)} MB", Modifier.padding(horizontal = 20.dp), size = 15.sp, family = Oc.mono)
                     Spacer(Modifier.height(6.dp))
-                    Txt("Keep it private: it holds your sign-ins.", Modifier.padding(horizontal = 20.dp), size = 14.sp, color = c.textDim)
+                    Txt(SSet.keepPrivateSignIns, Modifier.padding(horizontal = 20.dp), size = 14.sp, color = c.textDim)
                 }
-                is Backup.State.Restored -> Txt("Restored. Restarting…", Modifier.padding(20.dp), size = 15.sp)
+                is Backup.State.Restored -> Txt(SSet.restoredRestarting, Modifier.padding(20.dp), size = 15.sp)
                 is Backup.State.Failed -> Txt(s.message, Modifier.padding(20.dp), size = 14.sp, color = c.danger, lineHeight = 19.sp)
                 else -> {}
             }
         }
     }
     pending?.let { uri ->
-        OcDialog("Restore this backup?", { pending = null }, confirmText = "Restore", danger = true, onConfirm = {
+        OcDialog(SSet.restoreBackupQuestion, { pending = null }, confirmText = SSet.restore, danger = true, onConfirm = {
             pending = null; scope.launch { Backup.restore(ctx, uri) }
-        }) { Txt("Chats, memory, skills and settings from the file replace the ones here. The app restarts when it is done.", size = 15.sp, color = c.textDim, lineHeight = 21.sp) }
+        }) { Txt(SSet.restoreBody, size = 15.sp, color = c.textDim, lineHeight = 21.sp) }
     }
 }

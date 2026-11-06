@@ -50,6 +50,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.cl0de.app.Graph
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SAcct
 import com.cl0de.app.api.str
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.Route
@@ -68,10 +70,10 @@ import kotlinx.coroutines.launch
 /** Providers with a free tier: sign in with your account on their site, then the key reaches the app by itself. */
 class FreeProvider(val id: String, val title: String, val note: String, val url: String, val keyRegex: Regex?, val where: String)
 
-val freeProviders = listOf(
-    FreeProvider("github-copilot", "GitHub", "Copilot · free plan", "", null, "GitHub"),
-    FreeProvider("groq", "Groq", "Fast open models · free tier", "https://console.groq.com/keys", Regex("gsk_[A-Za-z0-9]{30,}"), "Groq Console"),
-    FreeProvider("openrouter", "OpenRouter", "Models marked :free", "https://openrouter.ai/settings/keys", Regex("sk-or-[A-Za-z0-9_\\-]{20,}"), "OpenRouter"),
+val freeProviders get() = listOf(
+    FreeProvider("github-copilot", "GitHub", SAcct.copilotFreePlan, "", null, "GitHub"),
+    FreeProvider("groq", "Groq", SAcct.groqFreeNote, "https://console.groq.com/keys", Regex("gsk_[A-Za-z0-9]{30,}"), "Groq Console"),
+    FreeProvider("openrouter", "OpenRouter", SAcct.openRouterFreeNote, "https://openrouter.ai/settings/keys", Regex("sk-or-[A-Za-z0-9_\\-]{20,}"), "OpenRouter"),
 )
 
 /**
@@ -110,7 +112,7 @@ fun ConnectScreen(providerId: String, nav: Nav) {
         handled = true; state = "saving"
         scope.launch {
             try { Graph.api.setApiKey(providerId, key.trim()); done("key") }
-            catch (e: Exception) { error = e.message ?: "Could not save the key"; state = "error"; handled = false }
+            catch (e: Exception) { error = e.message ?: SAcct.couldNotSaveKey; state = "error"; handled = false }
         }
     }
 
@@ -125,7 +127,7 @@ fun ConnectScreen(providerId: String, nav: Nav) {
                 Graph.api.oauthCallback(providerId, 0, null)           // waiting for confirmation in the browser
                 runCatching { com.cl0de.app.data.FreeModels.enableCopilot(select = false) }
                 done("github")
-            } catch (e: Exception) { error = e.message ?: "GitHub did not confirm the sign-in"; state = "error" }
+            } catch (e: Exception) { error = e.message ?: SAcct.githubDidNotConfirm; state = "error" }
         }
     } else {
         LaunchedEffect(Unit) { open(fp.url) }
@@ -152,36 +154,36 @@ fun ConnectScreen(providerId: String, nav: Nav) {
             }
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 28.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
                 if (device) {
-                    Txt("Enter this code on GitHub", size = 24.sp, weight = FontWeight.Medium, align = TextAlign.Center)
+                    Txt(SAcct.enterCodeOnGitHub, size = 24.sp, weight = FontWeight.Medium, align = TextAlign.Center)
                     Spacer(Modifier.height(24.dp))
                     if (code == null) Spinner(34.dp) else {
                         val clip = LocalClipboardManager.current
-                        Box(Modifier.clip(Oc.round(24.dp)).background(c.surface).border(1.dp, c.border, Oc.round(24.dp)).tap { clip.setText(AnnotatedString(code!!)); Graph.chats.toasts.tryEmit("Code copied") }.padding(horizontal = 32.dp, vertical = 22.dp)) {
+                        Box(Modifier.clip(Oc.round(24.dp)).background(c.surface).border(1.dp, c.border, Oc.round(24.dp)).tap { clip.setText(AnnotatedString(code!!)); Graph.chats.toasts.tryEmit(SAcct.codeCopied) }.padding(horizontal = 32.dp, vertical = 22.dp)) {
                             Txt(code!!, size = 36.sp, family = Oc.mono, weight = FontWeight.Medium)
                         }
                         Spacer(Modifier.height(18.dp))
-                        Txt("GitHub opened in your browser. Paste or type the code there and approve. This screen continues by itself.", size = 16.sp, color = c.textDim, align = TextAlign.Center, lineHeight = 23.sp)
+                        Txt(SAcct.githubOpenedHint, size = 16.sp, color = c.textDim, align = TextAlign.Center, lineHeight = 23.sp)
                         Spacer(Modifier.height(20.dp)); Spinner(28.dp)
                         Spacer(Modifier.height(20.dp))
-                        Txt("Free access depends on your Copilot plan; GitHub has a free one.", size = 14.sp, color = c.textDim, align = TextAlign.Center)
+                        Txt(SAcct.freeAccessCopilot, size = 14.sp, color = c.textDim, align = TextAlign.Center)
                     }
                 } else {
                     Spinner(34.dp)
                     Spacer(Modifier.height(26.dp))
-                    Txt("Sign in with ${fp.title} in your browser", size = 24.sp, weight = FontWeight.Medium, align = TextAlign.Center)
+                    Txt(SAcct.signInWithTitle(fp.title), size = 24.sp, weight = FontWeight.Medium, align = TextAlign.Center)
                     Spacer(Modifier.height(16.dp))
                     Txt(
-                        "1. Sign in on ${fp.where}.\n2. Create an API key if you have none.\n3. Tap the key's copy button and come back — the app picks it up on its own.",
+                        SAcct.signInInstructions(fp.where),
                         size = 16.sp, color = c.textDim, lineHeight = 25.sp,
                     )
                     Spacer(Modifier.height(24.dp))
-                    Box(Modifier.clip(CircleShape).border(1.dp, c.border, CircleShape).tap { open(fp.url) }.padding(horizontal = 22.dp, vertical = 14.dp)) { Txt("Open ${fp.where} again", size = 16.sp) }
+                    Box(Modifier.clip(CircleShape).border(1.dp, c.border, CircleShape).tap { open(fp.url) }.padding(horizontal = 22.dp, vertical = 14.dp)) { Txt(SAcct.openAgain(fp.where), size = 16.sp) }
                     Spacer(Modifier.height(28.dp))
-                    Txt("or paste the key here", size = 14.sp, color = c.textDim)
+                    Txt(SAcct.orPasteKeyHere, size = 14.sp, color = c.textDim)
                     Spacer(Modifier.height(8.dp))
-                    OcTextField(manual, { manual = it }, placeholder = "API key", password = true, mono = true)
+                    OcTextField(manual, { manual = it }, placeholder = SAcct.apiKey, password = true, mono = true)
                     Spacer(Modifier.height(10.dp))
-                    Pill("Connect", { acceptKey(manual) }, enabled = manual.length > 12, modifier = Modifier.fillMaxWidth())
+                    Pill(SAcct.connect, { acceptKey(manual) }, enabled = manual.length > 12, modifier = Modifier.fillMaxWidth())
                 }
             }
         }
@@ -189,15 +191,15 @@ fun ConnectScreen(providerId: String, nav: Nav) {
             Box(Modifier.fillMaxSize().screenBackdrop("ConnectScreen2"), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     when (state) {
-                        "saving" -> { Spinner(40.dp); Spacer(Modifier.height(20.dp)); Txt("Connecting…", size = 18.sp, color = c.textDim) }
+                        "saving" -> { Spinner(40.dp); Spacer(Modifier.height(20.dp)); Txt(SAcct.connecting, size = 18.sp, color = c.textDim) }
                         "done" -> {
                             Box(Modifier.size(72.dp).clip(CircleShape).background(c.ok), contentAlignment = Alignment.Center) { Ico(Ic.Check, tint = c.bg, size = 40.dp) }
-                            Spacer(Modifier.height(20.dp)); Txt("${fp.title} connected", size = 22.sp, weight = FontWeight.Medium)
+                            Spacer(Modifier.height(20.dp)); Txt(SAcct.providerConnected(fp.title), size = 22.sp, weight = FontWeight.Medium)
                             Txt(Graph.catalog.selectedLabel(), Modifier.padding(top = 6.dp), size = 15.sp, color = c.textDim)
                         }
                         else -> {
-                            Txt(error ?: "Something went wrong", size = 17.sp, color = c.danger, align = TextAlign.Center, modifier = Modifier.padding(32.dp))
-                            Box(Modifier.clip(CircleShape).border(1.dp, c.border, CircleShape).tap { nav.pop() }.padding(horizontal = 22.dp, vertical = 14.dp)) { Txt("Back", size = 16.sp) }
+                            Txt(error ?: SAcct.somethingWentWrong, size = 17.sp, color = c.danger, align = TextAlign.Center, modifier = Modifier.padding(32.dp))
+                            Box(Modifier.clip(CircleShape).border(1.dp, c.border, CircleShape).tap { nav.pop() }.padding(horizontal = 22.dp, vertical = 14.dp)) { Txt(S.back, size = 16.sp) }
                         }
                     }
                 }

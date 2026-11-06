@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
+import com.cl0de.app.data.SChat
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.Route
 import com.cl0de.app.ui.theme.Ic
@@ -60,7 +61,7 @@ fun SlashMenu(state: ComposerState, nav: Nav) {
                 .background(if (lined) c.bg else c.surface).border(1.dp, c.border, shape)
                 .heightIn(max = 300.dp).verticalScroll(rememberScrollState()).padding(vertical = 6.dp),
         ) {
-            if (items.isEmpty()) Txt(if (all.isEmpty()) "Loading skills…" else "No skill named /$q", Modifier.padding(horizontal = 18.dp, vertical = 12.dp), size = 15.sp, color = c.textDim, family = mono)
+            if (items.isEmpty()) Txt(if (all.isEmpty()) SChat.loadingSkills else SChat.noSkillNamed(q), Modifier.padding(horizontal = 18.dp, vertical = 12.dp), size = 15.sp, color = c.textDim, family = mono)
             items.forEach { it ->
                 Row(
                     Modifier.fillMaxWidth().tap { state.pickSlash(it.name) }.padding(horizontal = 14.dp, vertical = 9.dp),
@@ -82,7 +83,7 @@ fun SlashMenu(state: ComposerState, nav: Nav) {
             ) {
                 Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) { Ico(Ic.Plus, tint = c.textDim, size = 18.dp) }
                 Spacer(Modifier.width(12.dp))
-                Txt(if (lined) "MANAGE SKILLS" else "Manage skills", size = if (lined) 12.sp else 15.sp, color = c.textDim, family = mono)
+                Txt(if (lined) SChat.manageSkillsCaps else SChat.manageSkills, size = if (lined) 12.sp else 15.sp, color = c.textDim, family = mono)
             }
         }
     }

@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import com.cl0de.app.Graph
+import com.cl0de.app.data.SChat
 import com.cl0de.app.ui.theme.Ic
 import com.cl0de.app.ui.theme.Oc
 import coil3.compose.AsyncImage
@@ -98,7 +99,7 @@ object OutFiles {
     fun open(ctx: Context, f: File) {
         val i = Intent(Intent.ACTION_VIEW).setDataAndType(uri(ctx, f), mime(f)).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         runCatching { ctx.startActivity(Intent.createChooser(i, f.name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-            .onFailure { Graph.chats.toasts.tryEmit("No app can open ${f.name}") }
+            .onFailure { Graph.chats.toasts.tryEmit(SChat.noAppCanOpen(f.name)) }
     }
 
     fun share(ctx: Context, f: File) {
@@ -115,9 +116,9 @@ object OutFiles {
             put(MediaStore.Downloads.RELATIVE_PATH, "Download/OpenCode")
         }
         val u = ctx.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-        if (u == null) { Graph.chats.toasts.tryEmit("Could not save ${f.name}"); return@withContext }
+        if (u == null) { Graph.chats.toasts.tryEmit(SChat.couldNotSave(f.name)); return@withContext }
         ctx.contentResolver.openOutputStream(u)?.use { out -> f.inputStream().use { it.copyTo(out) } }
-        Graph.chats.toasts.tryEmit("Saved to Download/OpenCode")
+        Graph.chats.toasts.tryEmit(SChat.savedToDownloads)
     }
 
     fun human(b: Long) = com.cl0de.app.data.Attachments.human(b)
@@ -142,7 +143,7 @@ private object Player {
                 prepare(); start()
             }
             path = f.path; playing = true
-        }.onFailure { Graph.chats.toasts.tryEmit("Can't play ${f.name}") }
+        }.onFailure { Graph.chats.toasts.tryEmit(SChat.cantPlay(f.name)) }
     }
 
     fun stop() { mp?.release(); mp = null; path = null; playing = false }
@@ -199,7 +200,7 @@ private fun PlainCard(f: File, mime: String) {
                 Ico(if (mime.contains("zip") || mime.contains("tar") || mime.contains("compressed")) Ic.Archive else Ic.File, tint = c.textDim, size = 20.dp)
             }
             Spacer(Modifier.width(12.dp))
-            TitleBlock(f, f.extension.uppercase().ifBlank { "FILE" } + " · " + OutFiles.human(f.length()), Modifier.weight(1f))
+            TitleBlock(f, f.extension.uppercase().ifBlank { SChat.fileFallback } + " · " + OutFiles.human(f.length()), Modifier.weight(1f))
             Actions(f)
         }
     }
@@ -268,7 +269,7 @@ private fun VideoCard(f: File) {
                 Box(Modifier.size(52.dp).clip(CircleShape).background(Color(0xCC000000)), contentAlignment = Alignment.Center) { Ico(Ic.Play, tint = Color.White, size = 24.dp) }
             }
             Row(Modifier.padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                TitleBlock(f, "Video · " + OutFiles.human(f.length()), Modifier.weight(1f))
+                TitleBlock(f, SChat.videoSub(OutFiles.human(f.length())), Modifier.weight(1f))
                 Actions(f)
             }
         }
@@ -282,7 +283,7 @@ private fun ImageCard(f: File) {
         Column {
             AsyncImage(f, null, Modifier.fillMaxWidth().heightInImage().tap(onClick = { OutFiles.open(ctx, f) }), contentScale = ContentScale.Crop)
             Row(Modifier.padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                TitleBlock(f, "Image · " + OutFiles.human(f.length()), Modifier.weight(1f))
+                TitleBlock(f, SChat.imageSub(OutFiles.human(f.length())), Modifier.weight(1f))
                 Actions(f)
             }
         }

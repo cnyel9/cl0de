@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
+import com.cl0de.app.data.SMisc
 import com.cl0de.app.runtime.RuntimeState
 import com.cl0de.app.ui.components.Heading
 import com.cl0de.app.ui.components.Logo
@@ -44,11 +45,10 @@ fun SetupScreen(rt: RuntimeState) {
     ) {
         Logo(80.dp)
         Spacer(Modifier.height(28.dp))
-        Heading("OpenCode on this phone", size = 30.sp, align = TextAlign.Center)
+        Heading(SMisc.openCodeOnPhone, size = 30.sp, align = TextAlign.Center)
         Spacer(Modifier.height(14.dp))
         Txt(
-            "The agent runs in a Linux container (Ubuntu via proot) right on your device — no computer needed. " +
-                "Setup downloads about 110 MB once.",
+            SMisc.setupBody,
             size = 16.sp, color = c.textDim, align = TextAlign.Center, lineHeight = 23.sp,
         )
         Spacer(Modifier.height(32.dp))
@@ -62,9 +62,9 @@ fun SetupScreen(rt: RuntimeState) {
             is RuntimeState.InstallFailed -> {
                 Txt(rt.message, size = 15.sp, color = c.danger, align = TextAlign.Center)
                 Spacer(Modifier.height(20.dp))
-                Pill("Try again", { scope.launch { Graph.runtime.install() } })
+                Pill(SMisc.tryAgain, { scope.launch { Graph.runtime.install() } })
             }
-            else -> Pill("Set up", { scope.launch { Graph.runtime.install() } })
+            else -> Pill(SMisc.setUp, { scope.launch { Graph.runtime.install() } })
         }
         if (log.isNotEmpty() && rt !is RuntimeState.NotInstalled) {
             Spacer(Modifier.height(24.dp))

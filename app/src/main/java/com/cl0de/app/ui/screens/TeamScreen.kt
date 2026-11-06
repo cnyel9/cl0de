@@ -25,6 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
 import com.cl0de.app.data.Team
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SMisc
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.components.IconBtn
 import com.cl0de.app.ui.components.OcDialog
@@ -62,41 +64,41 @@ fun TeamScreen(nav: Nav) {
     fun save() = scope.launch { Team.sync(force = true) }
 
     Column(Modifier.fillMaxSize().screenBackdrop("Team")) {
-        TopBar("Team", left = { IconBtn(Ic.Back, { nav.pop() }) })
+        TopBar(SMisc.team, left = { IconBtn(Ic.Back, { nav.pop() }) })
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding().padding(bottom = 32.dp)) {
             Column(Modifier.padding(horizontal = 16.dp)) {
-                Segmented(listOf("off" to "Off", "manual" to "My team", "auto" to "Automatic"), mode, {
+                Segmented(listOf("off" to S.off, "manual" to SMisc.myTeam, "auto" to SMisc.automatic), mode, {
                     mode = it; prefs.teamMode = it; save()
                 })
                 Txt(
                     when (mode) {
-                        "manual" -> "The main agent splits each task between your helpers and runs them in parallel, then checks and combines what they did."
-                        "auto" -> "The main agent decides how many helpers a task needs and which model each one uses. Simple tasks get none."
-                        else -> "One agent does everything, as before."
+                        "manual" -> SMisc.teamManualDesc
+                        "auto" -> SMisc.teamAutoDesc
+                        else -> SMisc.teamOffDesc
                     },
                     Modifier.padding(top = 10.dp, start = 4.dp), size = 14.sp, color = c.textDim, lineHeight = 20.sp,
                 )
             }
             when (mode) {
                 "manual" -> {
-                    SectionLabel("Helpers")
+                    SectionLabel(SMisc.helpers)
                     SettingsGroup {
                         members.forEachIndexed { i, m ->
                             SettingsRow(m.name, subtitle = m.role + " · " + modelName(m.provider, m.model), icon = Ic.Bot, chevron = true, onClick = { editing = i })
                         }
-                        SettingsRow("Add a helper", icon = Ic.Plus, onClick = { editing = -1 })
+                        SettingsRow(SMisc.addHelper, icon = Ic.Plus, onClick = { editing = -1 })
                     }
                     if (members.isEmpty()) Txt(
-                        "For example: Researcher (reads the code and finds what to change), Coder (makes the change), Reviewer (checks it and runs the tests).",
+                        SMisc.helpersExample,
                         Modifier.padding(20.dp), size = 14.sp, color = c.textDim, lineHeight = 20.sp,
                     )
                 }
                 "auto" -> {
-                    SectionLabel("At most")
+                    SectionLabel(SMisc.atMost)
                     Column(Modifier.padding(horizontal = 16.dp)) {
                         Segmented(listOf("2" to "2", "3" to "3", "4" to "4", "5" to "5"), max, { max = it; prefs.teamMax = it })
                     }
-                    SectionLabel("Models the helpers can use")
+                    SectionLabel(SMisc.helperModels)
                     SettingsGroup {
                         pool.forEach { ref ->
                             val (p, m) = ref.split('/', limit = 2).let { it[0] to it.getOrElse(1) { "" } }
@@ -104,16 +106,16 @@ fun TeamScreen(nav: Nav) {
                                 IconBtn(Ic.Close, { pool = pool - ref; Team.pool = pool; save() }, tint = c.textDim, size = 38.dp, iconSize = 18.dp)
                             })
                         }
-                        SettingsRow("Add a model", icon = Ic.Plus, onClick = { poolPicker = true })
+                        SettingsRow(SMisc.addModel, icon = Ic.Plus, onClick = { poolPicker = true })
                     }
                     Txt(
-                        if (pool.isEmpty()) "No models picked: helpers use the model you chat with." else "Mix a strong model with a fast one: the main agent gives hard parts to the first and simple ones to the second.",
+                        if (pool.isEmpty()) SMisc.poolEmpty else SMisc.poolMix,
                         Modifier.padding(20.dp), size = 14.sp, color = c.textDim, lineHeight = 20.sp,
                     )
                 }
             }
             if (mode != "off") Txt(
-                "Helpers show up in the chat under Team while they work. Each one counts against your model limits.",
+                SMisc.helpersNote,
                 Modifier.padding(horizontal = 20.dp, vertical = 8.dp), size = 13.sp, color = c.textDim, lineHeight = 18.sp,
             )
         }
@@ -134,7 +136,7 @@ fun TeamScreen(nav: Nav) {
 }
 
 private fun modelName(p: String, m: String): String =
-    if (m.isBlank()) "chat model" else Graph.catalog.model(p, m)?.name?.ifBlank { null } ?: m
+    if (m.isBlank()) SMisc.chatModel else Graph.catalog.model(p, m)?.name?.ifBlank { null } ?: m
 
 @Composable
 private fun MemberDialog(old: Team.Member?, onDelete: (() -> Unit)?, onDismiss: () -> Unit, onSave: (Team.Member) -> Unit) {
@@ -144,16 +146,16 @@ private fun MemberDialog(old: Team.Member?, onDelete: (() -> Unit)?, onDismiss: 
     var provider by remember { mutableStateOf(old?.provider ?: "") }
     var model by remember { mutableStateOf(old?.model ?: "") }
     var picking by remember { mutableStateOf(false) }
-    OcDialog(if (old == null) "New helper" else old.name, onDismiss, confirmText = "Save", onConfirm = {
+    OcDialog(if (old == null) SMisc.newHelper else old.name, onDismiss, confirmText = S.save, onConfirm = {
         if (name.isNotBlank() && role.isNotBlank()) onSave(Team.Member(name.trim(), role.trim(), provider, model))
     }) {
         Column {
-            OcTextField(name, { name = it }, Modifier.fillMaxWidth(), placeholder = "Name, e.g. Reviewer")
+            OcTextField(name, { name = it }, Modifier.fillMaxWidth(), placeholder = SMisc.nameExampleReviewer)
             Spacer(Modifier.height(10.dp))
-            OcTextField(role, { role = it }, Modifier.fillMaxWidth(), placeholder = "What it does", singleLine = false, minLines = 2)
+            OcTextField(role, { role = it }, Modifier.fillMaxWidth(), placeholder = SMisc.whatItDoes, singleLine = false, minLines = 2)
             Spacer(Modifier.height(6.dp))
-            SettingsRow("Model", subtitle = modelName(provider, model), icon = Ic.Cpu, chevron = true, onClick = { picking = true })
-            if (onDelete != null) SettingsRow("Remove", icon = Ic.Trash, titleColor = c.danger, onClick = onDelete)
+            SettingsRow(S.model, subtitle = modelName(provider, model), icon = Ic.Cpu, chevron = true, onClick = { picking = true })
+            if (onDelete != null) SettingsRow(S.remove, icon = Ic.Trash, titleColor = c.danger, onClick = onDelete)
         }
     }
     if (picking) ModelPicker({ picking = false }, allowChatModel = true) { p, m -> provider = p; model = m; picking = false }
@@ -164,10 +166,10 @@ private fun MemberDialog(old: Team.Member?, onDelete: (() -> Unit)?, onDismiss: 
 private fun ModelPicker(onDismiss: () -> Unit, allowChatModel: Boolean = false, onPick: (String, String) -> Unit) {
     val providers by Graph.catalog.providers.collectAsState()
     var query by remember { mutableStateOf("") }
-    PickerFrame("Choose a model", onDismiss, skipHalf = false) {
-        PickSearch(query, { query = it }, "Search models")
+    PickerFrame(SMisc.chooseModel, onDismiss, skipHalf = false) {
+        PickSearch(query, { query = it }, SMisc.searchModels)
         LazyColumn(Modifier.heightIn(max = 520.dp).padding(bottom = 8.dp)) {
-            if (allowChatModel) item { PickRow("Same as the chat", { onPick("", "") }) }
+            if (allowChatModel) item { PickRow(SMisc.sameAsChat, { onPick("", "") }) }
             providers.forEach { p ->
                 val ms = p.models.values.filter { query.isBlank() || it.name.contains(query, true) || it.id.contains(query, true) }.sortedBy { it.name }
                 if (ms.isNotEmpty()) {
