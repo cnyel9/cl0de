@@ -23,6 +23,20 @@ android {
     // targetSdk 28: see above; not an error for an APK outside Play
     lint { disable += "ExpiredTargetSdkVersion" }
 
+    signingConfigs {
+        // Fixed release key, supplied by CI from repo secrets (env vars below).
+        // Without the env vars this config stays empty and release falls back to the debug key.
+        create("fixed") {
+            val ksPath = System.getenv("SIGNING_KEYSTORE_PATH")
+            if (ksPath != null) {
+                storeFile = file(ksPath)
+                storePassword = System.getenv("SIGNING_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("SIGNING_KEY_ALIAS") ?: "cl0de"
+                keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
@@ -31,8 +45,13 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // No own key yet: sign with the debug key so the APK installs on the phone.
-            signingConfig = signingConfigs.getByName("debug")
+            // Fixed key from CI secrets when present (same key every build, so updates
+            // install over the previous version); debug key only as a local fallback.
+            signingConfig = if (System.getenv("SIGNING_KEYSTORE_PATH") != null) {
+                signingConfigs.getByName("fixed")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 
