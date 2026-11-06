@@ -138,6 +138,20 @@ fun TopBar(
     right: @Composable RowScope.() -> Unit = {},
     serif: Boolean = false,
 ) {
+    // No title (home and chat bars): a real Row, so the left side is width-limited by weight
+    // and can never slide under the right-side buttons on narrow screens.
+    if (title == null) {
+        Row(
+            Modifier.fillMaxWidth().statusBarsPadding().height(64.dp).padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.weight(1f)) { androidx.compose.runtime.CompositionLocalProvider(LocalInTopBar provides true) { left?.invoke() } }
+            androidx.compose.runtime.CompositionLocalProvider(LocalInTopBar provides true) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (Oc.look.id.kimiLike) 8.dp else 0.dp), content = right)
+            }
+        }
+        return
+    }
     // Cl0de: the bar sits on a dark strip of sky with a pixel edge
     Box(Modifier.fillMaxWidth().statusBarsPadding().height(64.dp).padding(horizontal = 8.dp)) {
         Box(Modifier.align(Alignment.CenterStart)) { androidx.compose.runtime.CompositionLocalProvider(LocalInTopBar provides true) { left?.invoke() } }

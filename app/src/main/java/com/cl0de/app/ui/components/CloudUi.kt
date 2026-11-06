@@ -1065,9 +1065,9 @@ fun GhostCloud(size: androidx.compose.ui.unit.Dp, active: Boolean = true, eyesLo
 fun GhostCloudButton(active: Boolean, onClick: () -> Unit) {
     val c = Oc.c
     androidx.compose.foundation.layout.Box(
-        Modifier.size(48.dp).clip(androidx.compose.foundation.shape.CircleShape)
+        Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape)
             .background(if (active) c.text.copy(alpha = 0.12f) else c.surfaceHigh.copy(alpha = 0.7f))
             .border(1.dp, if (active) c.textDim else c.border, androidx.compose.foundation.shape.CircleShape).tap(onClick = onClick),
         contentAlignment = androidx.compose.ui.Alignment.Center,
-    ) { GhostCloud(26.dp, active, blinks = false) }
+    ) { GhostCloud(22.dp, active, blinks = false) }
 }

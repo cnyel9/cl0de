@@ -178,8 +178,8 @@ fun ChatScreen(id: String, nav: Nav, onMenu: () -> Unit) {
     Column(Modifier.fillMaxSize().lookBackdrop().imePadding()) {
         TopBar(
             title = null,
-            left = { Row(verticalAlignment = Alignment.CenterVertically) { if (incognito) IconBtn(Ic.Close, { nav.pop() }) else IconBtn(Ic.Menu, onMenu); com.cl0de.app.ui.components.TopModelPill(state) } },
-            right = { com.cl0de.app.ui.components.UsageRing(chat, nav); if (!incognito) IconBtn(Ic.Plus, { nav.root(com.cl0de.app.ui.Route.Home) }) },
+            left = { Row(verticalAlignment = Alignment.CenterVertically) { if (incognito) IconBtn(Ic.Close, { nav.pop() }) else IconBtn(Ic.Menu, onMenu, size = 40.dp); com.cl0de.app.ui.components.TopModelPill(state) } },
+            right = { com.cl0de.app.ui.components.UsageRing(chat, nav); if (!incognito) IconBtn(Ic.Plus, { nav.root(com.cl0de.app.ui.Route.Home) }, size = 40.dp) },
         )
         Box(Modifier.fillMaxWidth().padding(bottom = 6.dp), contentAlignment = Alignment.Center) {
             Row(

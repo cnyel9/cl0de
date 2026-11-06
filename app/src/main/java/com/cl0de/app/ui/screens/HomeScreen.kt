@@ -104,11 +104,11 @@ fun HomeScreen(nav: Nav, onMenu: () -> Unit, code: Boolean = false) {
     Column(Modifier.fillMaxSize().imePadding()) {
         Box(Modifier.graphicsLayer { alpha = 1f - prog.value }) {
             TopBar(
-                left = { Row(verticalAlignment = Alignment.CenterVertically) { IconBtn(Ic.Menu, onMenu); com.cl0de.app.ui.components.TopModelPill(state) } },
+                left = { Row(verticalAlignment = Alignment.CenterVertically) { IconBtn(Ic.Menu, onMenu, size = 40.dp); com.cl0de.app.ui.components.TopModelPill(state) } },
                 right = {
                     com.cl0de.app.ui.components.UsageRing(null, nav)
                     if (Oc.look.id == "cloud") com.cl0de.app.ui.components.GhostCloudButton(ghost) { ghost = !ghost }
-                    else IconBtn(Ic.Ghost, { ghost = !ghost }, tint = if (ghost) c.text else c.textDim)
+                    else IconBtn(Ic.Ghost, { ghost = !ghost }, tint = if (ghost) c.text else c.textDim, size = 40.dp)
                     if (code) Row(
                         Modifier.padding(end = 8.dp).clip(CircleShape).clickable { picker = true }.padding(horizontal = 14.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
