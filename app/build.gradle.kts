@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "app.ocmobile"
+    namespace = "com.cl0de.app"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "app.ocmobile"
+        applicationId = "com.cl0de.app"
         minSdk = 26
         // 28 on purpose: proot runs binaries from the app data directory,
         // and with targetSdk >= 29 Android forbids exec from app_data_file (same as Termux).

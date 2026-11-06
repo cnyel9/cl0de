@@ -1,13 +1,13 @@
-package app.ocmobile
+package com.cl0de.app
 
-import app.ocmobile.api.AgentInfo
-import app.ocmobile.api.OcJson
-import app.ocmobile.api.ProvidersResponse
-import app.ocmobile.api.Session
-import app.ocmobile.api.obj
-import app.ocmobile.api.parseMessages
-import app.ocmobile.api.str
-import app.ocmobile.runtime.TarExtractor
+import com.cl0de.app.api.AgentInfo
+import com.cl0de.app.api.OcJson
+import com.cl0de.app.api.ProvidersResponse
+import com.cl0de.app.api.Session
+import com.cl0de.app.api.obj
+import com.cl0de.app.api.parseMessages
+import com.cl0de.app.api.str
+import com.cl0de.app.runtime.TarExtractor
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertEquals

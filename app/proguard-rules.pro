@@ -1,4 +1,4 @@
--keepclassmembers class app.ocmobile.** { *; }
+-keepclassmembers class com.cl0de.app.** { *; }
 -dontwarn okhttp3.internal.platform.**
 -dontwarn org.conscrypt.**
 -dontwarn org.bouncycastle.**
