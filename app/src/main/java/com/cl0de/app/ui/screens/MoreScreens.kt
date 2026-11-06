@@ -239,6 +239,21 @@ fun ConfigEditorScreen(nav: Nav) {
     var text by remember { mutableStateOf("") }
     var loaded by remember { mutableStateOf(false) }
     var msg by remember { mutableStateOf<String?>(null) }
+    var importMsg by remember { mutableStateOf<String?>(null) }
+    var importing by remember { mutableStateOf(false) }
+    val importCtx = LocalContext.current
+    val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            importing = true; importMsg = null
+            runCatching { com.cl0de.app.data.ConfigImport.import(importCtx, uri) }
+                .onSuccess { r ->
+                    importMsg = com.cl0de.app.data.AppLang.s("Berhasil masuk: ${r.providers} provider, ${r.models} model.", "Imported: ${r.providers} providers, ${r.models} models.")
+                    load()
+                }
+                .onFailure { importMsg = it.message ?: com.cl0de.app.data.AppLang.s("Impor gagal", "Import failed") }
+            importing = false
+        }
+    }
     val pretty = remember { Json { prettyPrint = true } }
     suspend fun load() {
         text = runCatching { pretty.encodeToString(JsonObject.serializer(), Graph.api.config()) }.getOrElse { "{}" }; loaded = true
@@ -256,6 +271,17 @@ fun ConfigEditorScreen(nav: Nav) {
                 else scope.launch { msg = runCatching { Graph.api.patchGlobalConfig(o); "Saved" }.getOrElse { it.message } }
             }, modifier = Modifier.fillMaxWidth())
             msg?.let { Txt(it, size = 15.sp, color = if (it == "Saved") c.ok else c.danger, modifier = Modifier.padding(top = 12.dp)) }
+            Spacer(Modifier.height(26.dp))
+            Txt(com.cl0de.app.data.AppLang.s("Impor dari aplikasi lama", "Import from the old app"), size = 16.sp, weight = androidx.compose.ui.text.font.FontWeight.SemiBold, modifier = Modifier.padding(bottom = 6.dp))
+            Txt(
+                com.cl0de.app.data.AppLang.s(
+                    "Sumbernya: ekspor Backup dari aplikasi lama (file .tar.gz), atau salinan manual file .config/opencode/opencode.jsonc dari aplikasi lama, misalnya lewat Termux. Simpan dulu berkasnya ke penyimpanan bersama, lalu pilih di sini. Isinya digabungkan ke config ini.",
+                    "Source: a Backup export from the old app (.tar.gz file), or a manual copy of the old app's .config/opencode/opencode.jsonc, for example via Termux. Save the file to shared storage first, then pick it here. Its contents are merged into this config.",
+                ),
+                size = 14.sp, color = c.textDim, modifier = Modifier.padding(bottom = 12.dp), lineHeight = 20.sp,
+            )
+            Pill(if (importing) com.cl0de.app.data.AppLang.s("Mengimpor...", "Importing...") else "Impor config aplikasi lama", { if (!importing) importer.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth())
+            importMsg?.let { Txt(it, size = 15.sp, color = c.textDim, modifier = Modifier.padding(top = 12.dp)) }
         }
     }
 }
