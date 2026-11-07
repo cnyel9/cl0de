@@ -81,7 +81,7 @@ suspend fun connectAccount(key: String, method: String) {
     runCatching { Graph.catalog.refresh() }
 }
 
-/** Sign-in screen: free models through a GitHub or Google account (or Groq/OpenRouter), no subscription. */
+/** Sign-in screen: free models through a GitHub account (or Groq/OpenRouter), no subscription. */
 @Composable
 fun LoginScreen(nav: Nav) {
     val c = Oc.c
@@ -108,9 +108,9 @@ fun LoginScreen(nav: Nav) {
                     contentAlignment = Alignment.Center,
                 ) { Txt("Start without an account", size = 17.sp, color = c.bg, weight = FontWeight.Medium) }
             }
-            freeProviders.filter { it.id == "github-copilot" || it.id == "google" }.forEachIndexed { i, p ->
+            freeProviders.filter { it.id == "github-copilot" }.forEachIndexed { i, p ->
                 Rise(shown, 4 + i) {
-                    ProviderButton("Continue with ${p.title}", p.note, when (p.id) { "github-copilot" -> Brand.GitHub; "google" -> Brand.Google; else -> Brand.Key }) { nav.push(Route.Connect(p.id)) }
+                    ProviderButton("Continue with ${p.title}", p.note, when (p.id) { "github-copilot" -> Brand.GitHub; else -> Brand.Key }) { nav.push(Route.Connect(p.id)) }
                 }
             }
         }
@@ -129,7 +129,7 @@ private fun Rise(shown: Boolean, step: Int, content: @Composable () -> Unit) {
     ) { content() }
 }
 
-private enum class Brand { GitHub, Google, Email, Key }
+private enum class Brand { GitHub, Email, Key }
 
 @Composable
 private fun ProviderButton(text: String, note: String, brand: Brand, onClick: () -> Unit) {
@@ -142,12 +142,6 @@ private fun ProviderButton(text: String, note: String, brand: Brand, onClick: ()
         Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) {
             when (brand) {
                 Brand.GitHub -> Ico(Ic.GitHub, size = 28.dp)
-                Brand.Google -> Box(Modifier.size(28.dp).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
-                    androidx.compose.material3.Text(
-                        "G", fontSize = 19.sp, fontWeight = FontWeight.Bold,
-                        style = androidx.compose.ui.text.TextStyle(brush = Brush.linearGradient(listOf(Color(0xFF4285F4), Color(0xFFEA4335), Color(0xFFFBBC05), Color(0xFF34A853)))),
-                    )
-                }
                 Brand.Email -> Ico(Ic.Mail, size = 26.dp)
                 Brand.Key -> Ico(Ic.Key, size = 26.dp)
             }

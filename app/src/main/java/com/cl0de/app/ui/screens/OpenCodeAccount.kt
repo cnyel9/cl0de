@@ -111,7 +111,7 @@ private const val INJECT = """
     if (p.indexOf('/login') >= 0 || p.indexOf('/signup') >= 0 || p.indexOf('/auth') === 0) {
       say('login');
       if (!window.__clicked && method) {
-        var want = method === 'github' ? 'GitHub' : method === 'google' ? 'Google' : 'email';
+        var want = method === 'github' ? 'GitHub' : 'email';
         var b = byText(new RegExp('continue with\\s*' + want, 'i'));
         if (b) { window.__clicked = 1; b.click(); }
       }
@@ -150,8 +150,8 @@ fun ConsoleLoginScreen(method: String, nav: Nav) {
     val c = Oc.c
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
-    // choose | web | browser | paste | saving | done | error
-    var stage by remember { mutableStateOf(if (method.isBlank()) "choose" else if (method == "google") "browser" else "web") }
+    // choose | web | paste | saving | done | error
+    var stage by remember { mutableStateOf(if (method.isBlank()) "choose" else "web") }
     var via by remember { mutableStateOf(method.ifBlank { "github" }) }
     var webStage by remember { mutableStateOf("login") }   // login | console | keys
     var error by remember { mutableStateOf<String?>(null) }
@@ -165,36 +165,21 @@ fun ConsoleLoginScreen(method: String, nav: Nav) {
             catch (e: Exception) { error = e.message ?: "Could not save the key"; stage = "error"; handled = false }
         }
     }
-    fun openBrowser() = ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(CONSOLE_LOGIN)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 
-    // Google doesn't allow embedded windows: use the browser, and catch the key from the clipboard when the person comes back
-    if (stage == "browser") {
-        val owner = LocalLifecycleOwner.current
-        DisposableEffect(owner) {
-            val obs = LifecycleEventObserver { _, e ->
-                if (e == Lifecycle.Event.ON_RESUME) {
-                    val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    KEY_RE.find(cm.primaryClip?.getItemAt(0)?.coerceToText(ctx)?.toString().orEmpty())?.let { accept(it.value) }
-                }
-            }
-            owner.lifecycle.addObserver(obs)
-            onDispose { owner.lifecycle.removeObserver(obs) }
-        }
-    }
-    BackHandler(stage in setOf("web", "browser", "paste", "error") && method.isBlank()) { stage = "choose"; handled = false }
+    BackHandler(stage in setOf("web", "paste", "error") && method.isBlank()) { stage = "choose"; handled = false }
 
     Column(Modifier.fillMaxSize().screenBackdrop("OpenCodeAccount1").statusBarsPadding().imePadding()) {
         Row(Modifier.fillMaxWidth().height(60.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconBtn(if (stage == "choose" || stage == "done" || method.isNotBlank()) Ic.Close else Ic.Back, {
                 if (stage == "choose" || stage == "done" || method.isNotBlank()) { if (!nav.pop()) nav.root(Route.Home) } else { stage = "choose"; handled = false }
             })
-            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { if (stage == "web" || stage == "browser") Steps(if (webStage == "keys") 1 else if (webStage == "console") 1 else 0) }
+            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { if (stage == "web") Steps(if (webStage == "keys") 1 else if (webStage == "console") 1 else 0) }
             Spacer(Modifier.width(48.dp))
         }
         AnimatedContent(stage, Modifier.weight(1f), label = "acct", transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(120)) }) { s ->
             when (s) {
                 "choose" -> Choose(
-                    onMethod = { m -> via = m; stage = if (m == "google") "browser".also { openBrowser() } else "web" },
+                    onMethod = { m -> via = m; stage = "web" },
                     onPaste = { stage = "paste" },
                 )
                 "web" -> Box(Modifier.fillMaxSize()) {
@@ -235,25 +220,6 @@ fun ConsoleLoginScreen(method: String, nav: Nav) {
                             Modifier.weight(1f), size = 14.sp, lineHeight = 20.sp,
                         )
                     }
-                }
-                "browser" -> Column(Modifier.fillMaxSize().padding(horizontal = 28.dp), verticalArrangement = Arrangement.Center) {
-                    Heading("Finish in your browser", size = 28.sp)
-                    Spacer(Modifier.height(10.dp))
-                    Txt("Google doesn't allow signing in inside apps, so this one takes a short detour.", size = 16.sp, color = c.textDim, lineHeight = 23.sp)
-                    Spacer(Modifier.height(26.dp))
-                    listOf("Sign in with Google", "Open API Keys and create a key", "Tap the key's copy button and come back").forEachIndexed { i, t ->
-                        Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.size(30.dp).clip(CircleShape).background(c.surfaceHigh), contentAlignment = Alignment.Center) { Txt("${i + 1}", size = 14.sp, weight = FontWeight.Medium) }
-                            Spacer(Modifier.width(14.dp)); Txt(t, size = 16.sp)
-                        }
-                    }
-                    Spacer(Modifier.height(26.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Spinner(16.dp, stroke = 2.dp); Spacer(Modifier.width(10.dp))
-                        Txt("Waiting for the key in your clipboard…", size = 14.sp, color = c.textDim)
-                    }
-                    Spacer(Modifier.height(20.dp))
-                    BigButton("Open the browser again", filled = false) { openBrowser() }
                 }
                 "paste" -> PasteKey { accept(it) }
                 "saving" -> Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -309,7 +275,6 @@ private fun Choose(onMethod: (String) -> Unit, onPaste: () -> Unit) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Method(Ic.GitHub, "GitHub", "Fastest — done inside the app") { onMethod("github") }
             Method(Ic.Mail, "Email", "A code arrives in your inbox") { onMethod("email") }
-            Method(Ic.Globe, "Google", "Opens your browser for a moment") { onMethod("google") }
         }
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth().clip(Oc.pill).tap(scale = 0.98f, onClick = onPaste).padding(vertical = 14.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {

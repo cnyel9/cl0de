@@ -91,7 +91,7 @@ class Prefs(ctx: Context) {
     var introEnabled by bool("intro_enabled", true)
     /** Shelf topics, comma-separated; empty means any. */
     var memoryTopics by str("memory_topics", "")
-    var signedIn by str("signed_in", "")          // github | google | email | key | ""
+    var signedIn by str("signed_in", "")          // github | email | key | ""
     var loginSeen by bool("login_seen", false)
     var githubLogin by str("github_login", "")           // GitHub sign-in inside the environment (gh holds the token)
     var githubName by str("github_name", "")

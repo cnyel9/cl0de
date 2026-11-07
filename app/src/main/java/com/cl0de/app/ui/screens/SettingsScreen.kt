@@ -103,7 +103,7 @@ fun SettingsScreen(nav: Nav, onMenu: () -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Txt(prefs.userName.ifBlank { "OpenCode" }, size = 19.sp)
                     Txt(
-                        when (prefs.signedIn) { "github" -> "Signed in with GitHub"; "google" -> "Signed in with Google"; "email" -> "Signed in with email"; "key" -> "Using an API key"; else -> "Not signed in" },
+                        when (prefs.signedIn) { "github" -> "Signed in with GitHub"; "email" -> "Signed in with email"; "key" -> "Using an API key"; else -> "Not signed in" },
                         size = 14.sp, color = c.textDim, modifier = Modifier.padding(top = 2.dp),
                     )
                 }
@@ -115,7 +115,7 @@ fun SettingsScreen(nav: Nav, onMenu: () -> Unit) {
             if (prefs.signedIn.isBlank()) {
                 Column(Modifier.padding(16.dp).fillMaxWidth().clip(Oc.round(22.dp)).border(1.dp, c.border, Oc.round(22.dp)).padding(24.dp)) {
                     Txt("Sign in for more", size = 21.sp)
-                    Txt("Free models share a limit per internet connection. Sign in with GitHub or Google for a free allowance of your own.", size = 17.sp, color = c.textDim, modifier = Modifier.padding(top = 8.dp, bottom = 16.dp))
+                    Txt("Free models share a limit per internet connection. Sign in with GitHub for a free allowance of your own.", size = 17.sp, color = c.textDim, modifier = Modifier.padding(top = 8.dp, bottom = 16.dp))
                     Pill("Sign in", { nav.push(Route.Login) })
                 }
             } else if (!hasGo) {
@@ -169,7 +169,7 @@ fun SettingsScreen(nav: Nav, onMenu: () -> Unit) {
                 SettingsGroup {
                     SettingsRow("Log out", icon = Ic.External, titleColor = c.danger, onClick = {
                         scope.launch {
-                            for (pid in listOf("opencode", "opencode-go", "github-copilot", "google", "groq", "openrouter")) runCatching { Graph.api.removeAuth(pid) }
+                            for (pid in listOf("opencode", "opencode-go", "github-copilot", "groq", "openrouter")) runCatching { Graph.api.removeAuth(pid) }
                             runCatching { Graph.api.disposeAll() }
                             com.cl0de.app.data.Vault.forgetAccount()
                             prefs.signedIn = ""; runCatching { Graph.catalog.refresh() }

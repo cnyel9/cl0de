@@ -58,7 +58,7 @@ object Vault {
             val keys = JSONObject(f.readText()).keys().asSequence().toSet()
             val m = when {
                 "github-copilot" in keys -> "github"
-                keys.any { it == "opencode" || it == "opencode-go" || it == "google" || it == "groq" || it == "openrouter" } -> "key"
+                keys.any { it == "opencode" || it == "opencode-go" || it == "groq" || it == "openrouter" } -> "key"
                 else -> ""
             }
             if (m.isNotEmpty()) { Graph.prefs.signedIn = m; Graph.prefs.loginSeen = true }
