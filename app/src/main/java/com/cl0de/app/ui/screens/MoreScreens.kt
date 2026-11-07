@@ -253,7 +253,7 @@ fun ConfigEditorScreen(nav: Nav) {
             Pill("Save", {
                 val o = runCatching { OcJson.parseToJsonElement(text) as JsonObject }.getOrNull()
                 if (o == null) msg = "Not valid JSON object"
-                else scope.launch { msg = runCatching { Graph.api.patchConfig(o); "Saved" }.getOrElse { it.message } }
+                else scope.launch { msg = runCatching { Graph.api.patchGlobalConfig(o); "Saved" }.getOrElse { it.message } }
             }, modifier = Modifier.fillMaxWidth())
             msg?.let { Txt(it, size = 15.sp, color = if (it == "Saved") c.ok else c.danger, modifier = Modifier.padding(top = 12.dp)) }
         }
