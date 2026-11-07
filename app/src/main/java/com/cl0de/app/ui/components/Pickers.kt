@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.cl0de.app.data.SChat
 import com.cl0de.app.ui.theme.Ic
 import com.cl0de.app.ui.theme.Oc
 
@@ -59,7 +60,7 @@ fun PickerFrame(
                     Spacer(Modifier.width(4.dp))
                 }
                 Txt(title, Modifier.weight(1f), size = if (terminal) 15.sp else 16.sp, weight = FontWeight.Medium, color = if (terminal) c.text else c.text)
-                if (terminal) Txt(if (onBack != null) "esc back" else "esc", Modifier.clip(Oc.round(0.dp)).clickable { (onBack ?: onDismiss)() }.padding(horizontal = 12.dp, vertical = 10.dp), size = 13.sp, color = c.textDim)
+                if (terminal) Txt(if (onBack != null) SChat.escBack else "esc", Modifier.clip(Oc.round(0.dp)).clickable { (onBack ?: onDismiss)() }.padding(horizontal = 12.dp, vertical = 10.dp), size = 13.sp, color = c.textDim)
             }
             content()
         }

@@ -41,6 +41,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
+import com.cl0de.app.data.SChat
 import com.cl0de.app.ui.components.Ico
 import com.cl0de.app.ui.components.Txt
 import com.cl0de.app.ui.components.tap
@@ -56,15 +57,15 @@ val lookHomes = setOf("hairline", "notebook", "messenger", "cards", "chatgpt")
 private class Idea(val icon: androidx.compose.ui.graphics.vector.ImageVector, val title: String, val sub: String, val prompt: String)
 
 private fun ideas(code: Boolean) = if (code) listOf(
-    Idea(Ic.Search, "Explain", "this project", "Look around this project and explain how it is put together."),
-    Idea(Ic.Wrench, "Fix", "a failing build", "Run the build, find what fails and fix it."),
-    Idea(Ic.ListCheck, "Plan", "a new feature", "Help me plan a new feature for this project: "),
-    Idea(Ic.Diff, "Review", "my changes", "Review my uncommitted changes and point out problems."),
+    Idea(Ic.Search, SChat.ideaExplain, SChat.ideaExplainSub, "Look around this project and explain how it is put together."),
+    Idea(Ic.Wrench, SChat.ideaFix, SChat.ideaFixSub, "Run the build, find what fails and fix it."),
+    Idea(Ic.ListCheck, SChat.ideaPlan, SChat.ideaPlanSub, "Help me plan a new feature for this project: "),
+    Idea(Ic.Diff, SChat.ideaReview, SChat.ideaReviewSub, "Review my uncommitted changes and point out problems."),
 ) else listOf(
-    Idea(Ic.Edit, "Write", "or edit a text", "Help me write "),
-    Idea(Ic.Globe, "Search", "the web", "Search the web for "),
-    Idea(Ic.Sparkle, "Brainstorm", "a few ideas", "Brainstorm ideas for "),
-    Idea(Ic.Code, "Code", "a small script", "Write a small script that "),
+    Idea(Ic.Edit, SChat.ideaWrite, SChat.ideaWriteSub, "Help me write "),
+    Idea(Ic.Globe, SChat.ideaSearch, SChat.ideaSearchSub, "Search the web for "),
+    Idea(Ic.Sparkle, SChat.ideaBrainstorm, SChat.ideaBrainstormSub, "Brainstorm ideas for "),
+    Idea(Ic.Code, "Code", SChat.ideaCodeSub, "Write a small script that "),
 )
 
 /** Empty screen for the look: each with its own character; tapping a suggestion puts the text in the input. */
@@ -88,8 +89,8 @@ private fun HairlineHome(code: Boolean, onPick: (String) -> Unit) {
         Spacer(Modifier.height(14.dp))
         Text(
             buildAnnotatedString {
-                append(if (code) "Ship it " else "Ready when ")
-                withStyle(SpanStyle(color = c.accent)) { append(if (code) "today." else "you are.") }
+                append(if (code) SChat.shipIt else SChat.readyWhen)
+                withStyle(SpanStyle(color = c.accent)) { append(if (code) SChat.shipToday else SChat.youAre) }
             },
             fontFamily = Oc.heading, fontWeight = FontWeight.SemiBold, fontSize = 30.sp, lineHeight = 36.sp, color = c.text,
         )
@@ -110,11 +111,11 @@ private fun HairlineHome(code: Boolean, onPick: (String) -> Unit) {
 @Composable
 private fun NotebookHome(code: Boolean, onPick: (String) -> Unit) {
     val c = Oc.c
-    val date = remember { SimpleDateFormat("EEEE, d MMMM", Locale.ENGLISH).format(Date()) }
+    val date = remember { SimpleDateFormat("EEEE, d MMMM", if (com.cl0de.app.data.AppLang.indonesian()) Locale("id", "ID") else Locale.ENGLISH).format(Date()) }
     Column(Modifier.fillMaxWidth().padding(horizontal = 32.dp)) {
         Text(date, fontFamily = Oc.reply, fontStyle = FontStyle.Italic, fontSize = 15.sp, color = c.textDim)
         Spacer(Modifier.height(8.dp))
-        Txt(if (code) "What are we building today?" else "What shall we write today?", size = 30.sp, family = Oc.heading, lineHeight = 36.sp)
+        Txt(if (code) SChat.whatBuilding else SChat.whatWrite, size = 30.sp, family = Oc.heading, lineHeight = 36.sp)
         Spacer(Modifier.height(18.dp))
         Box(Modifier.width(48.dp).height(2.dp).background(c.accent))
         Spacer(Modifier.height(18.dp))
@@ -139,15 +140,15 @@ private fun MessengerHome(code: Boolean, onPick: (String) -> Unit) {
         }
         Spacer(Modifier.height(12.dp))
         Txt("OpenCode", size = 21.sp, weight = FontWeight.SemiBold)
-        Txt(if (code) "online · ready to code" else "online", size = 14.sp, color = c.link)
+        Txt(if (code) SChat.onlineReady else SChat.onlineStatus, size = 14.sp, color = c.link)
         Spacer(Modifier.height(22.dp))
         Column(
             Modifier.clip(Oc.round(18.dp)).background(c.surface).padding(horizontal = 20.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Txt("No messages here yet…", size = 15.sp, weight = FontWeight.SemiBold)
+            Txt(SChat.noMessagesYet, size = 15.sp, weight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
-            Txt("Send a message or tap a greeting below.", size = 14.sp, color = c.textDim, align = TextAlign.Center)
+            Txt(SChat.sendOrTap, size = 14.sp, color = c.textDim, align = TextAlign.Center)
             Spacer(Modifier.height(12.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 ideas(code).forEach { i ->
@@ -164,9 +165,9 @@ private fun CardsHome(code: Boolean, onPick: (String) -> Unit) {
     val c = Oc.c
     val list = ideas(code)
     Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
-        Txt(if (code) "Start a task" else "Start something", Modifier.padding(start = 4.dp), size = 24.sp, family = Oc.heading, weight = FontWeight.SemiBold)
+        Txt(if (code) SChat.startTask else SChat.startSomething, Modifier.padding(start = 4.dp), size = 24.sp, family = Oc.heading, weight = FontWeight.SemiBold)
         Spacer(Modifier.height(4.dp))
-        Txt("Pick a card or just type below.", Modifier.padding(start = 4.dp), size = 14.sp, color = c.textDim)
+        Txt(SChat.pickCard, Modifier.padding(start = 4.dp), size = 14.sp, color = c.textDim)
         Spacer(Modifier.height(16.dp))
         list.chunked(2).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -195,7 +196,7 @@ private fun CardsHome(code: Boolean, onPick: (String) -> Unit) {
 private fun ChatGptHome(code: Boolean, onPick: (String) -> Unit) {
     val c = Oc.c
     Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Txt(if (code) "What are we working on?" else "What can I help with?", size = 25.sp, family = Oc.heading, weight = FontWeight.SemiBold, align = TextAlign.Center)
+        Txt(if (code) SChat.whatWorking else SChat.whatHelp, size = 25.sp, family = Oc.heading, weight = FontWeight.SemiBold, align = TextAlign.Center)
         Spacer(Modifier.height(26.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ideas(code).forEach { i ->

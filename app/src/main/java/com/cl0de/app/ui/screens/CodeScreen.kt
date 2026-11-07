@@ -42,6 +42,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SAcct
 import com.cl0de.app.api.Session
 import com.cl0de.app.data.Device
 import com.cl0de.app.ui.Nav
@@ -104,31 +106,31 @@ fun CodeScreen(nav: Nav, onMenu: () -> Unit) {
 
     Box(Modifier.fillMaxSize().screenBackdrop("CodeScreen1")) {
         Column(Modifier.fillMaxSize()) {
-            TopBar(if (Oc.look.id.kimiLike) "Remote devices" else "Code", left = { IconBtn(Ic.Menu, onMenu) }, right = { IconBtn(Ic.Clock2, { nav.push(Route.Recents) }) })
+            TopBar(if (Oc.look.id.kimiLike) SAcct.remoteDevices else SAcct.codeTab, left = { IconBtn(Ic.Menu, onMenu) }, right = { IconBtn(Ic.Clock2, { nav.push(Route.Recents) }) })
             LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 120.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                item { Txt("Devices", Modifier.padding(start = 8.dp, top = 8.dp), size = 16.sp, color = c.textDim) }
+                item { Txt(SAcct.devices, Modifier.padding(start = 8.dp, top = 8.dp), size = 16.sp, color = c.textDim) }
                 item {
                     Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        DeviceChip("This phone", connected && activeId.isEmpty(), activeId.isEmpty(), Ic.Phone, { Graph.devices.select("") }, {})
+                        DeviceChip(SAcct.thisPhone, connected && activeId.isEmpty(), activeId.isEmpty(), Ic.Phone, { Graph.devices.select("") }, {})
                         devices.forEach { d ->
                             DeviceChip(d.name, connected && activeId == d.id, activeId == d.id, Ic.Laptop, { switchTo(d) }, { deviceMenu = d }, connecting == d.id)
                         }
                         Row(
                             Modifier.clip(CircleShape).border(1.dp, c.border, CircleShape).tap(onClick = { addDevice = true }).height(52.dp).padding(horizontal = 20.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                        ) { Ico(Ic.Plus, size = 22.dp); Spacer(Modifier.width(10.dp)); Txt("Add device", size = 18.sp) }
+                        ) { Ico(Ic.Plus, size = 22.dp); Spacer(Modifier.width(10.dp)); Txt(SAcct.addDevice, size = 18.sp) }
                     }
                 }
                 item {
                     Row(Modifier.fillMaxWidth().padding(start = 8.dp, top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Txt("Sessions", Modifier.weight(1f), size = 16.sp, color = c.textDim)
+                        Txt(SAcct.sessions, Modifier.weight(1f), size = 16.sp, color = c.textDim)
                         Box {
                             Row(Modifier.clip(CircleShape).clickable { filterMenu = true }.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Txt(mapOf("all" to "All", "pinned" to "Pinned", "working" to "Working", "input" to "Needs input")[filter]!!, size = 16.sp, color = c.textDim)
+                                Txt(mapOf("all" to S.all, "pinned" to SAcct.pinned, "working" to SAcct.working, "input" to SAcct.needsInput)[filter]!!, size = 16.sp, color = c.textDim)
                                 Spacer(Modifier.width(4.dp)); Ico(Ic.ChevronDown, tint = c.textDim, size = 18.dp)
                             }
                             DropdownMenu(filterMenu, { filterMenu = false }, containerColor = c.surface) {
-                                listOf("all" to "All", "pinned" to "Pinned", "working" to "Working", "input" to "Needs input").forEach { (k, l) ->
+                                listOf("all" to S.all, "pinned" to SAcct.pinned, "working" to SAcct.working, "input" to SAcct.needsInput).forEach { (k, l) ->
                                     DropdownMenuItem(text = { Txt(l, size = 17.sp, color = if (filter == k) c.link else c.text) }, onClick = { filter = k; filterMenu = false })
                                 }
                             }
@@ -137,21 +139,21 @@ fun CodeScreen(nav: Nav, onMenu: () -> Unit) {
                 }
                 if (list.isEmpty()) item {
                     Txt(
-                        if (!connected && remote != null) "Can't reach ${remote.name}. Check that it is on and that opencode serve is running." else "No code sessions yet. Chats are in the menu; pick a project to start coding.",
+                        if (!connected && remote != null) SAcct.cantReachDevice(remote.name) else SAcct.noCodeSessionsYet,
                         Modifier.padding(horizontal = 8.dp, vertical = 24.dp), size = 16.sp, color = c.textDim,
                     )
                 }
                 items(list, key = { it.id }) { s -> SessionCard(s, statuses[s.id], needInput, questions.firstOrNull { it.sessionID == s.id }?.let { q -> q.questions.firstOrNull()?.question }, remote, connected, nav) }
             }
         }
-        Pill("New session", { nav.push(Route.NewCode) }, Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 24.dp).androidNavPad(), icon = Ic.Plus)
+        Pill(SAcct.newSession, { nav.push(Route.NewCode) }, Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 24.dp).androidNavPad(), icon = Ic.Plus)
     }
     if (addDevice) AddDeviceSheet { addDevice = false }
     deviceMenu?.let { d ->
         OcSheet({ deviceMenu = null }, d.name) {
             Column(Modifier.padding(bottom = 16.dp)) {
                 Txt(d.url, Modifier.padding(horizontal = 24.dp, vertical = 8.dp), size = 15.sp, color = c.textDim)
-                com.cl0de.app.ui.components.ChoiceRow("Remove device", false, { Graph.devices.remove(d.id); deviceMenu = null }, icon = Ic.Trash)
+                com.cl0de.app.ui.components.ChoiceRow(SAcct.removeDevice, false, { Graph.devices.remove(d.id); deviceMenu = null }, icon = Ic.Trash)
             }
         }
     }
@@ -203,8 +205,8 @@ private fun SessionCard(s: Session, status: String?, needInput: Set<String>, que
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (remote != null) {
                         Ico(Ic.Laptop, tint = if (connected) c.ok else c.textDim, size = 20.dp); Spacer(Modifier.width(8.dp))
-                        Txt(if (connected) "Connected" else "Disconnected", size = 16.sp, color = if (connected) c.ok else c.textDim)
-                        Txt("  •  Remote control", size = 16.sp, color = c.textDim)
+                        Txt(if (connected) SAcct.connected else SAcct.disconnected, size = 16.sp, color = if (connected) c.ok else c.textDim)
+                        Txt(SAcct.remoteControlSuffix, size = 16.sp, color = c.textDim)
                     } else {
                         Ico(Ic.Folder, tint = c.textDim, size = 20.dp); Spacer(Modifier.width(8.dp))
                         Txt(dir, size = 16.sp, color = c.textDim, maxLines = 1)
@@ -214,7 +216,7 @@ private fun SessionCard(s: Session, status: String?, needInput: Set<String>, que
         }
         if (s.id in needInput) {
             Box(Modifier.padding(top = 14.dp).fillMaxWidth().clip(Oc.round(16.dp)).background(c.surface).padding(16.dp)) {
-                Txt(question ?: "Waiting for your permission", size = 16.sp, maxLines = 3, lineHeight = 22.sp)
+                Txt(question ?: SAcct.waitingForPermission, size = 16.sp, maxLines = 3, lineHeight = 22.sp)
             }
         }
     }
@@ -224,7 +226,7 @@ fun shortAgo(ms: Long): String {
     if (ms <= 0) return ""
     val d = (System.currentTimeMillis() - ms) / 1000
     return when {
-        d < 60 -> "now"
+        d < 60 -> SAcct.shortNow
         d < 3600 -> "${d / 60}m"
         d < 86400 -> "${d / 3600}h"
         d < 30 * 86400 -> "${d / 86400}d"
@@ -241,9 +243,9 @@ private fun AddDeviceSheet(onDismiss: () -> Unit) {
     var pass by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    OcSheet(onDismiss, "Add device", skipHalf = false) {
+    OcSheet(onDismiss, SAcct.addDevice, skipHalf = false) {
         Column(Modifier.imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Txt("Control OpenCode that runs on your computer. On it, run this — it starts OpenCode and shows a QR code:", size = 16.sp, color = c.textDim, lineHeight = 22.sp)
+            Txt(SAcct.controlOpenCodeComputer, size = 16.sp, color = c.textDim, lineHeight = 22.sp)
             Txt(QR_COMMAND, Modifier.clip(Oc.round(14.dp)).background(c.codeBg).padding(12.dp), size = 13.sp, family = Oc.mono)
             // QR scanner from Play services; without it the code can be opened with the phone's camera
             val ctx = androidx.compose.ui.platform.LocalContext.current
@@ -255,25 +257,25 @@ private fun AddDeviceSheet(onDismiss: () -> Unit) {
                     com.google.mlkit.vision.codescanner.GmsBarcodeScanning.getClient(ctx, opts).startScan()
                         .addOnSuccessListener { b ->
                             if (com.cl0de.app.data.ConnectLink.offer(b.rawValue.orEmpty())) onDismiss()
-                            else error = "That's not a Cl0de connection code"
+                            else error = SAcct.notCl0deCode
                         }
-                        .addOnFailureListener { error = "The scanner isn't available. Point your camera app at the code instead." }
+                        .addOnFailureListener { error = SAcct.scannerNotAvailable }
                 }.padding(vertical = 14.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Ico(Ic.Camera, tint = c.bg, size = 20.dp); Spacer(Modifier.width(10.dp))
-                    Txt("Scan QR code", size = 16.sp, color = c.bg)
+                    Txt(SAcct.scanQrCode, size = 16.sp, color = c.bg)
                 }
             }
-            Txt("Or enter it by hand:", size = 14.sp, color = c.textDim, modifier = Modifier.padding(top = 6.dp))
-            OcTextField(name, { name = it }, placeholder = "Name (e.g. Laptop)")
-            OcTextField(url, { url = it }, placeholder = "Address, e.g. 192.168.0.5:4096")
-            OcTextField(pass, { pass = it }, placeholder = "Server password", password = true)
+            Txt(SAcct.orEnterByHand, size = 14.sp, color = c.textDim, modifier = Modifier.padding(top = 6.dp))
+            OcTextField(name, { name = it }, placeholder = SAcct.nameExampleLaptop)
+            OcTextField(url, { url = it }, placeholder = SAcct.addressExample)
+            OcTextField(pass, { pass = it }, placeholder = SAcct.serverPassword, password = true)
             error?.let { Txt(it, size = 15.sp, color = c.danger) }
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-                if (busy) Spinner(28.dp) else SmallButton("Connect", {
-                    if (url.isBlank()) { error = "Enter the address"; return@SmallButton }
+                if (busy) Spinner(28.dp) else SmallButton(SAcct.connect, {
+                    if (url.isBlank()) { error = SAcct.enterAddress; return@SmallButton }
                     busy = true; error = null
                     val full = com.cl0de.app.data.Devices.normalize(url)
                     scope.launch {
@@ -283,7 +285,7 @@ private fun AddDeviceSheet(onDismiss: () -> Unit) {
                             Graph.devices.select(d.id)
                             onDismiss()
                         } catch (e: Exception) {
-                            error = e.message?.takeIf { it.isNotBlank() } ?: "Can't reach the server"
+                            error = e.message?.takeIf { it.isNotBlank() } ?: SAcct.cantReachServer
                         } finally { busy = false }
                     }
                 }, filled = true)

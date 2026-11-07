@@ -25,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
+import com.cl0de.app.data.SChat
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.theme.Ic
 import com.cl0de.app.ui.theme.Oc
@@ -49,9 +50,9 @@ fun TeamStrip(id: String, nav: Nav) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Ico(Ic.Users, tint = c.textDim, size = 16.dp); Spacer(Modifier.width(8.dp))
-        Txt(if (working > 0) "Team · $working working of ${kids.size}" else "Team · ${kids.size} done", size = 14.sp)
+        Txt(if (working > 0) SChat.teamWorking(working, kids.size) else SChat.teamDone(kids.size), size = 14.sp)
     }
-    if (open) PickerFrame("Team", { open = false }) {
+    if (open) PickerFrame(SChat.teamLabel, { open = false }) {
         Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
             kids.forEach { s ->
                 val busy = (statuses[s.id] ?: "idle") != "idle"
@@ -63,8 +64,8 @@ fun TeamStrip(id: String, nav: Nav) {
                     Box(Modifier.size(10.dp).clip(CircleShape).background(if (busy) c.accent else c.border))
                     Spacer(Modifier.width(14.dp))
                     Column(Modifier.weight(1f)) {
-                        Txt(s.title.replace(Regex("""\s*\(@[^)]*\)\s*$"""), "").ifBlank { "Helper" }, size = 16.sp, maxLines = 2)
-                        Txt(listOfNotNull(s.agent?.removePrefix("team-")?.replace('-', ' '), model, if (busy) "working" else "done").joinToString(" · "), size = 13.sp, color = c.textDim, maxLines = 1)
+                        Txt(s.title.replace(Regex("""\s*\(@[^)]*\)\s*$"""), "").ifBlank { SChat.helperFallback }, size = 16.sp, maxLines = 2)
+                        Txt(listOfNotNull(s.agent?.removePrefix("team-")?.replace('-', ' '), model, if (busy) SChat.workingWord else SChat.doneLower).joinToString(" · "), size = 13.sp, color = c.textDim, maxLines = 1)
                     }
                     Ico(Ic.ChevronRight, tint = c.textDim, size = 18.dp)
                 }

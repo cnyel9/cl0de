@@ -37,6 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
 import com.cl0de.app.data.Memory
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SSet
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.components.Ico
 import com.cl0de.app.ui.components.IconBtn
@@ -94,10 +96,10 @@ fun MemoryScreen(nav: Nav) {
     fun changed() { Memory.sync(); rev++ }
 
     Column(Modifier.fillMaxSize().screenBackdrop("MemoryScreen1")) {
-        TopBar("Memory", left = { IconBtn(Ic.Back, { nav.pop() }) }, right = {
+        TopBar(SSet.memory, left = { IconBtn(Ic.Back, { nav.pop() }) }, right = {
             IconBtn(Ic.Share, {
                 val i = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, Memory.exportText())
-                ctx.startActivity(android.content.Intent.createChooser(i, "Share memory").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                ctx.startActivity(android.content.Intent.createChooser(i, SSet.shareMemory).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
             })
         })
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).imePadding().navigationBarsPadding().padding(bottom = 32.dp)) {
@@ -106,31 +108,31 @@ fun MemoryScreen(nav: Nav) {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Txt("$total", size = 40.sp, family = Oc.heading, weight = FontWeight.SemiBold, lineHeight = 44.sp)
                     Spacer(Modifier.width(10.dp))
-                    Txt(if (total == 1) "fact" else "facts", Modifier.padding(bottom = 6.dp), size = 17.sp, color = c.textDim)
+                    Txt(if (total == 1) SSet.factWord else SSet.factsWord, Modifier.padding(bottom = 6.dp), size = 17.sp, color = c.textDim)
                     Spacer(Modifier.weight(1f))
-                    Txt("${shelves.size} ${if (shelves.size == 1) "shelf" else "shelves"}", Modifier.padding(bottom = 6.dp), size = 15.sp, color = c.textDim)
+                    Txt("${shelves.size} ${if (shelves.size == 1) SSet.shelfWord else SSet.shelvesWord}", Modifier.padding(bottom = 6.dp), size = 15.sp, color = c.textDim)
                 }
                 Spacer(Modifier.height(12.dp))
                 UsageBar((bytes / 24_000f).coerceIn(0f, 1f))
                 Spacer(Modifier.height(8.dp))
                 Txt(
-                    if (enabled) "${kb(bytes)} · loaded into every chat, so OpenCode answers without opening files"
-                    else "Memory is off — OpenCode neither reads nor saves it",
+                    if (enabled) SSet.memoryLoadedNote(kb(bytes))
+                    else SSet.memoryIsOff,
                     size = 13.sp, color = c.textDim, lineHeight = 18.sp,
                 )
             }
 
-            SectionLabel("Behaviour")
+            SectionLabel(SSet.behaviour)
             SettingsGroup {
-                SettingsRow("Use memory", subtitle = "Remember you across chats", icon = Ic.Scroll, trailing = {
+                SettingsRow(SSet.useMemory, subtitle = SSet.rememberAcrossChats, icon = Ic.Scroll, trailing = {
                     OcSwitch(enabled) { enabled = it; prefs.memoryEnabled = it; Memory.sync() }
                 })
-                SettingsRow("Save on its own", subtitle = if (auto) "Notices lasting facts and saves them" else "Only when you say \"remember…\"", icon = Ic.Zap, trailing = {
+                SettingsRow(SSet.saveOnItsOwn, subtitle = if (auto) SSet.noticesLastingFacts else SSet.onlyWhenRemember, icon = Ic.Zap, trailing = {
                     OcSwitch(auto) { auto = it; prefs.memoryAuto = it; Memory.sync() }
                 })
             }
 
-            SectionLabel("What to remember")
+            SectionLabel(SSet.whatToRemember)
             FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Memory.topics.forEach { (id, title, _) ->
                     val on = id in topics
@@ -150,13 +152,13 @@ fun MemoryScreen(nav: Nav) {
                 }
             }
             Txt(
-                if (topics.isEmpty()) "Nothing picked — OpenCode files facts on any topic." else "OpenCode keeps only these shelves.",
+                if (topics.isEmpty()) SSet.nothingPicked else SSet.keepsOnlyShelves,
                 Modifier.padding(start = 20.dp, end = 20.dp, top = 10.dp), size = 13.sp, color = c.textDim,
             )
 
-            SectionLabel("Shelves")
+            SectionLabel(SSet.shelvesLabel)
             if (shelves.isEmpty()) {
-                Txt("Nothing here yet. Say \"remember that…\" in a chat, or add a fact below.", Modifier.padding(horizontal = 20.dp), size = 15.sp, color = c.textDim, lineHeight = 21.sp)
+                Txt(SSet.nothingHereYetMemory, Modifier.padding(horizontal = 20.dp), size = 15.sp, color = c.textDim, lineHeight = 21.sp)
             } else Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 shelves.chunked(2).forEach { row ->
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -185,8 +187,8 @@ fun MemoryScreen(nav: Nav) {
 
             val notes = remember(rev) { Memory.projectNotes() }
             if (notes.isNotEmpty()) {
-                SectionLabel("Project notes · ${notes.size}")
-                Txt("Not loaded into every chat — OpenCode opens a note when the project comes up.", Modifier.padding(start = 20.dp, end = 20.dp, bottom = 10.dp), size = 13.sp, color = c.textDim, lineHeight = 18.sp)
+                SectionLabel(SSet.projectNotesCount(notes.size))
+                Txt(SSet.projectNotesNote, Modifier.padding(start = 20.dp, end = 20.dp, bottom = 10.dp), size = 13.sp, color = c.textDim, lineHeight = 18.sp)
                 SettingsGroup {
                     notes.forEach { f ->
                         val first = runCatching { f.readLines().drop(1).firstOrNull { it.isNotBlank() } }.getOrNull().orEmpty()
@@ -195,31 +197,31 @@ fun MemoryScreen(nav: Nav) {
                 }
             }
 
-            SectionLabel("Tell it something")
+            SectionLabel(SSet.tellItSomething)
             Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OcTextField(note, { note = it }, placeholder = "I live in Kraków and work nights", singleLine = false, minLines = 2)
-                Pill("Add to memory", { Memory.addNote(note); note = ""; changed() }, enabled = note.isNotBlank(), modifier = Modifier.fillMaxWidth())
-                Txt("Goes to the inbox; OpenCode files it onto the right shelf in your next chat.", size = 13.sp, color = c.textDim)
+                OcTextField(note, { note = it }, placeholder = SSet.liveExamplePlaceholder, singleLine = false, minLines = 2)
+                Pill(SSet.addToMemory, { Memory.addNote(note); note = ""; changed() }, enabled = note.isNotBlank(), modifier = Modifier.fillMaxWidth())
+                Txt(SSet.goesToInbox, size = 13.sp, color = c.textDim)
             }
 
-            SectionLabel("Your rules")
+            SectionLabel(SSet.yourRules)
             Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OcTextField(custom, { custom = it; customSaved = false }, placeholder = "e.g. keep each shelf under 30 lines; never store addresses", singleLine = false, minLines = 3)
+                OcTextField(custom, { custom = it; customSaved = false }, placeholder = SSet.memoryRulesPlaceholder, singleLine = false, minLines = 3)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SmallButton(if (customSaved) "Saved" else "Save", { prefs.memoryCustom = custom.trim(); Memory.sync(); customSaved = true }, filled = !customSaved)
-                    SmallButton("What OpenCode sees", { showPrompt = true })
+                    SmallButton(if (customSaved) SSet.saved else S.save, { prefs.memoryCustom = custom.trim(); Memory.sync(); customSaved = true }, filled = !customSaved)
+                    SmallButton(SSet.whatOpenCodeSees, { showPrompt = true })
                 }
             }
 
             if (shelves.isNotEmpty()) {
                 Spacer(Modifier.height(24.dp))
-                SettingsGroup { SettingsRow("Clear all memory", icon = Ic.Trash, titleColor = c.danger, onClick = { confirmClear = true }) }
+                SettingsGroup { SettingsRow(SSet.clearAllMemory, icon = Ic.Trash, titleColor = c.danger, onClick = { confirmClear = true }) }
             }
         }
     }
 
     open?.let { f -> ShelfSheet(f, onClose = { open = null }, onChanged = { changed() }) }
-    if (showPrompt) OcSheet({ showPrompt = false }, "What OpenCode sees", skipHalf = false) {
+    if (showPrompt) OcSheet({ showPrompt = false }, SSet.whatOpenCodeSees, skipHalf = false) {
         Txt(
             Memory.prompt() + "\n\n" + Memory.snapshot(),
             Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp),
@@ -227,11 +229,11 @@ fun MemoryScreen(nav: Nav) {
         )
     }
     if (confirmClear) {
-        OcDialog("Clear all memory?", { confirmClear = false }, "Clear", {
+        OcDialog(SSet.clearAllMemoryQuestion, { confirmClear = false }, S.clear, {
             (Memory.shelves() + Memory.projectNotes()).forEach { it.delete() }
             File(Memory.dir(), "MEMORY.md").writeText("# Memory index\n\nNothing saved yet.\n")
             confirmClear = false; changed()
-        }, danger = true) { Txt("All shelves are deleted. This cannot be undone.", size = 16.sp, color = c.textDim) }
+        }, danger = true) { Txt(SSet.allShelvesDeleted, size = 16.sp, color = c.textDim) }
     }
 }
 
@@ -249,12 +251,12 @@ private fun ShelfSheet(f: File, onClose: () -> Unit, onChanged: () -> Unit) {
             if (raw) {
                 OcTextField(text, { text = it }, singleLine = false, minLines = 8, mono = true)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    SmallButton("Cancel", { raw = false })
+                    SmallButton(S.cancel, { raw = false })
                     Spacer(Modifier.weight(1f))
-                    SmallButton("Save", { f.writeText(text.trimEnd() + "\n"); raw = false; rev++; onChanged() }, filled = true)
+                    SmallButton(S.save, { f.writeText(text.trimEnd() + "\n"); raw = false; rev++; onChanged() }, filled = true)
                 }
             } else {
-                if (list.isEmpty()) Txt("No facts on this shelf yet.", size = 15.sp, color = c.textDim)
+                if (list.isEmpty()) Txt(SSet.noFactsOnShelf, size = 15.sp, color = c.textDim)
                 list.forEach { fact ->
                     Row(
                         Modifier.fillMaxWidth().clip(Oc.round(16.dp)).background(c.surface).padding(start = 16.dp, top = 6.dp, bottom = 6.dp, end = 4.dp),
@@ -267,12 +269,12 @@ private fun ShelfSheet(f: File, onClose: () -> Unit, onChanged: () -> Unit) {
                     }
                 }
                 Spacer(Modifier.height(4.dp))
-                OcTextField(add, { add = it }, placeholder = "Add a fact to ${pretty(f).lowercase()}", singleLine = false)
+                OcTextField(add, { add = it }, placeholder = SSet.addFactTo(pretty(f).lowercase()), singleLine = false)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    if (f.name != "MEMORY.md") SmallButton("Delete shelf", { f.delete(); onChanged(); onClose() }, danger = true)
-                    SmallButton("Edit as text", { raw = true })
+                    if (f.name != "MEMORY.md") SmallButton(SSet.deleteShelf, { f.delete(); onChanged(); onClose() }, danger = true)
+                    SmallButton(SSet.editAsText, { raw = true })
                     Spacer(Modifier.weight(1f))
-                    SmallButton("Add", { if (add.isNotBlank()) { Memory.addFact(f, add); add = ""; rev++; onChanged() } }, filled = add.isNotBlank())
+                    SmallButton(S.add, { if (add.isNotBlank()) { Memory.addFact(f, add); add = ""; rev++; onChanged() } }, filled = add.isNotBlank())
                 }
             }
         }

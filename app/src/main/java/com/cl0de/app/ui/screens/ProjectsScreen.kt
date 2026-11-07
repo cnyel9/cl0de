@@ -26,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SAcct
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.components.ChoiceRow
 import com.cl0de.app.ui.components.EmptyState
@@ -63,15 +65,15 @@ fun ProjectsScreen(nav: Nav, onMenu: () -> Unit) {
     val projects = remember(sessions, newProject) { knownProjects() }
     Box(Modifier.fillMaxSize().screenBackdrop("ProjectsScreen1")) {
         Column(Modifier.fillMaxSize()) {
-            TopBar("Projects", left = { IconBtn(Ic.Menu, onMenu) })
-            if (projects.isEmpty()) EmptyState(Ic.Folder, "No projects yet", "Projects you create show up here.")
+            TopBar(S.projects, left = { IconBtn(Ic.Menu, onMenu) })
+            if (projects.isEmpty()) EmptyState(Ic.Folder, SAcct.noProjectsYet, SAcct.projectsShowHere)
             LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 120.dp)) {
                 item {
                     SettingsGroup {
                         projects.forEach { (dir, n) ->
                             SettingsRow(
-                                title = dir.removePrefix("/root/").ifBlank { "/" }, subtitle = "$n session${if (n == 1) "" else "s"}", icon = Ic.Folder,
-                                trailing = { if (Graph.prefs.currentDir == dir) Txt("Active", size = 14.sp, color = c.link) },
+                                title = dir.removePrefix("/root/").ifBlank { "/" }, subtitle = SAcct.sessionCount(n), icon = Ic.Folder,
+                                trailing = { if (Graph.prefs.currentDir == dir) Txt(SAcct.active, size = 14.sp, color = c.link) },
                                 onClick = { Graph.prefs.currentDir = dir; nav.root(com.cl0de.app.ui.Route.Home) },
                             )
                         }
@@ -79,7 +81,7 @@ fun ProjectsScreen(nav: Nav, onMenu: () -> Unit) {
                 }
             }
         }
-        Box(Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(16.dp)) { Pill("New project", { newProject = true }, icon = Ic.Plus) }
+        Box(Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(16.dp)) { Pill(S.newProject, { newProject = true }, icon = Ic.Plus) }
     }
     if (newProject) NewProjectDialog { newProject = false }
 }
@@ -88,15 +90,15 @@ fun ProjectsScreen(nav: Nav, onMenu: () -> Unit) {
 fun NewProjectDialog(onDone: () -> Unit) {
     var name by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
-    OcDialog("New project", onDone, "Create", {
-        if (!validName(name)) { error = "Use letters, digits, space, - _ ."; return@OcDialog }
+    OcDialog(S.newProject, onDone, S.create, {
+        if (!validName(name)) { error = SAcct.projectNameRule; return@OcDialog }
         val dir = "$WORK_ROOT/${name.trim()}"
         File(Graph.paths.rootfs, dir.trimStart('/')).mkdirs()
         Graph.prefs.currentDir = dir
         onDone()
     }) {
         Column {
-            OcTextField(name, { name = it; error = null }, placeholder = "Folder name")
+            OcTextField(name, { name = it; error = null }, placeholder = SAcct.folderName)
             error?.let { Txt(it, size = 14.sp, color = Oc.c.danger, modifier = Modifier.padding(top = 8.dp)) }
         }
     }
@@ -107,12 +109,12 @@ fun NewProjectDialog(onDone: () -> Unit) {
 fun ProjectPicker(onDismiss: () -> Unit) {
     var create by remember { mutableStateOf(false) }
     val projects = remember(create) { knownProjects() }
-    OcSheet(onDismiss, "Project", skipHalf = false) {
+    OcSheet(onDismiss, S.project, skipHalf = false) {
         LazyColumn(Modifier.padding(bottom = 24.dp)) {
             items(projects) { (dir, n) ->
-                ChoiceRow(dir.removePrefix("/root/").ifBlank { "/" }, Graph.prefs.currentDir == dir, { Graph.prefs.currentDir = dir; onDismiss() }, icon = Ic.Folder, subtitle = "$n sessions")
+                ChoiceRow(dir.removePrefix("/root/").ifBlank { "/" }, Graph.prefs.currentDir == dir, { Graph.prefs.currentDir = dir; onDismiss() }, icon = Ic.Folder, subtitle = SAcct.sessionsCount(n))
             }
-            item { ChoiceRow("New project…", false, { create = true }, icon = Ic.Plus) }
+            item { ChoiceRow(SAcct.newProjectEllipsis, false, { create = true }, icon = Ic.Plus) }
         }
     }
     if (create) NewProjectDialog { create = false; onDismiss() }

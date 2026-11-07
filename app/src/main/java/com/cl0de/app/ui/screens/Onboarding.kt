@@ -71,6 +71,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.cl0de.app.Graph
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SMisc
 import com.cl0de.app.runtime.RuntimeState
 import com.cl0de.app.ui.components.Heading
 import com.cl0de.app.ui.components.Ico
@@ -143,7 +145,7 @@ fun Onboarding() {
                 }
             }
             Box(Modifier.size(width = 56.dp, height = 44.dp), contentAlignment = Alignment.Center) {
-                if (step < STEPS.lastIndex) Txt("Skip", Modifier.clip(CircleShape).tap { go(if (step < TOUR) TOUR else STEPS.lastIndex) }.padding(8.dp), size = 15.sp, color = c.textDim)
+                if (step < STEPS.lastIndex) Txt(SMisc.skip, Modifier.clip(CircleShape).tap { go(if (step < TOUR) TOUR else STEPS.lastIndex) }.padding(8.dp), size = 15.sp, color = c.textDim)
             }
         }
 
@@ -170,7 +172,7 @@ fun Onboarding() {
                 Box(
                     Modifier.fillMaxWidth().height(56.dp).clip(Oc.pill).background(c.text).tap { go(step + 1) },
                     contentAlignment = Alignment.Center,
-                ) { Txt(when { step == 0 -> "Show me around"; step < TOUR - 1 -> "Next"; step == TOUR - 1 -> "Let's set up"; else -> "Continue" }, size = 17.sp, color = c.bg, weight = FontWeight.Medium) }
+                ) { Txt(when { step == 0 -> SMisc.showMeAround; step < TOUR - 1 -> SMisc.next; step == TOUR - 1 -> SMisc.letsSetUp; else -> SMisc.continueLabel }, size = 17.sp, color = c.bg, weight = FontWeight.Medium) }
             }
             Spacer(Modifier.height(12.dp))
             SetupLine(rt)
@@ -184,11 +186,11 @@ fun Onboarding() {
 private fun SetupLine(rt: RuntimeState) {
     val c = Oc.c
     val (text, dot, p) = when (rt) {
-        is RuntimeState.Installing -> Triple("Setting up OpenCode · ${rt.step}" + (rt.progress?.let { " · ${(it * 100).toInt()}%" } ?: ""), c.accent, rt.progress)
-        is RuntimeState.InstallFailed -> Triple("Setup stopped — you can retry on the last step", c.danger, null)
-        is RuntimeState.Running -> Triple("OpenCode is ready", c.ok, 1f)
-        is RuntimeState.NotInstalled -> Triple("Preparing…", c.textDim, null)
-        else -> Triple("Starting OpenCode…", c.accent, null)
+        is RuntimeState.Installing -> Triple(SMisc.settingUpOpenCode + " \u00b7 ${rt.step}" + (rt.progress?.let { " · ${(it * 100).toInt()}%" } ?: ""), c.accent, rt.progress)
+        is RuntimeState.InstallFailed -> Triple(SMisc.setupStopped, c.danger, null)
+        is RuntimeState.Running -> Triple(SMisc.openCodeReady, c.ok, 1f)
+        is RuntimeState.NotInstalled -> Triple(SMisc.preparing, c.textDim, null)
+        else -> Triple(SMisc.startingOpenCode, c.accent, null)
     }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
         Box(Modifier.size(7.dp).clip(CircleShape).background(dot))
@@ -227,22 +229,22 @@ private fun YouStep() {
     val c = Oc.c
     val prefs = Graph.prefs
     Scroll {
-        StepTitle("A bit about you", "So I can greet you and, if you want, remember what matters.")
-        Txt("What should it call you?", Modifier.padding(horizontal = 24.dp), size = 14.sp, color = c.textDim)
+        StepTitle(SMisc.aboutYouTitle, SMisc.aboutYouSub)
+        Txt(SMisc.whatCallYou, Modifier.padding(horizontal = 24.dp), size = 14.sp, color = c.textDim)
         Spacer(Modifier.height(8.dp))
         Box(Modifier.padding(horizontal = 20.dp).fillMaxWidth().clip(Oc.round(16.dp)).background(c.surface).border(1.dp, c.border, Oc.round(16.dp)).padding(horizontal = 16.dp, vertical = 15.dp)) {
-            if (prefs.userName.isEmpty()) Txt("Your name", size = 17.sp, color = c.textDim)
+            if (prefs.userName.isEmpty()) Txt(SMisc.yourName, size = 17.sp, color = c.textDim)
             BasicTextField(
                 prefs.userName, { prefs.userName = it.take(40) }, Modifier.fillMaxWidth(), singleLine = true,
                 textStyle = TextStyle(color = c.text, fontSize = 17.sp, fontFamily = Oc.body), cursorBrush = SolidColor(c.text),
             )
         }
         Spacer(Modifier.height(26.dp))
-        Txt("Memory", Modifier.padding(horizontal = 24.dp), size = 14.sp, color = c.textDim)
+        Txt(SMisc.memory, Modifier.padding(horizontal = 24.dp), size = 14.sp, color = c.textDim)
         Spacer(Modifier.height(8.dp))
         Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Choice(prefs.memoryEnabled, Ic.Scroll, "Remember me", "Keeps short notes about you and your projects on this phone, so you don't repeat yourself. You can see and delete everything.") { prefs.memoryEnabled = true; prefs.memoryAuto = true }
-            Choice(!prefs.memoryEnabled, Ic.Ghost, "Start fresh every chat", "Nothing is saved between chats. You can turn memory on later.") { prefs.memoryEnabled = false }
+            Choice(prefs.memoryEnabled, Ic.Scroll, SMisc.rememberMe, SMisc.rememberMeSub) { prefs.memoryEnabled = true; prefs.memoryAuto = true }
+            Choice(!prefs.memoryEnabled, Ic.Ghost, SMisc.startFresh, SMisc.startFreshSub) { prefs.memoryEnabled = false }
         }
     }
 }
@@ -286,17 +288,17 @@ private fun AccessStep() {
     val notif = NotificationManagerCompat.from(ctx).areNotificationsEnabled()
     val battery = ctx.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(ctx.packageName)
     Scroll {
-        StepTitle("Give it a hand", "All optional. Each one makes a feature work — you can change them later in Android settings.")
+        StepTitle(SMisc.giveHandTitle, SMisc.giveHandSub)
         Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Access(Ic.Bell, "Notifications", "Answers, progress on the lock screen and Allow / Deny buttons", notif) {
+            Access(Ic.Bell, SMisc.notifications, SMisc.notificationsSub, notif) {
                 ctx.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, ctx.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
-            Access(Ic.Zap, "Keep working in the background", "So long tasks don't stop when the screen is off", battery) {
+            Access(Ic.Zap, SMisc.keepWorkingBg, SMisc.keepWorkingBgSub, battery) {
                 @Suppress("BatteryLife")
                 ctx.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${ctx.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
-            Access(Ic.Mic, "Microphone", "Dictation and voice mode", has(Manifest.permission.RECORD_AUDIO)) { ask.launch(arrayOf(Manifest.permission.RECORD_AUDIO)) }
-            Access(Ic.Pin, "Location", "Only when you ask OpenCode where you are", has(Manifest.permission.ACCESS_COARSE_LOCATION)) {
+            Access(Ic.Mic, SMisc.microphone, SMisc.micSub, has(Manifest.permission.RECORD_AUDIO)) { ask.launch(arrayOf(Manifest.permission.RECORD_AUDIO)) }
+            Access(Ic.Pin, SMisc.location, SMisc.locationSub, has(Manifest.permission.ACCESS_COARSE_LOCATION)) {
                 ask.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
             }
             Row(
@@ -305,8 +307,8 @@ private fun AccessStep() {
             ) {
                 Ico(Ic.Phone, tint = c.accent, size = 22.dp); Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
-                    Txt("Let OpenCode use this phone", size = 16.sp, weight = FontWeight.Medium)
-                    Txt("Reminders, alarms, clipboard, camera, Downloads", size = 14.sp, color = c.textDim, lineHeight = 20.sp)
+                    Txt(SMisc.letOpenCodeUsePhone, size = 16.sp, weight = FontWeight.Medium)
+                    Txt(SMisc.phoneUseSub, size = 14.sp, color = c.textDim, lineHeight = 20.sp)
                 }
                 OcSwitch(prefs.phoneTools) { prefs.phoneTools = it }
             }
@@ -327,8 +329,8 @@ private fun Access(icon: ImageVector, title: String, sub: String, granted: Boole
             Txt(sub, size = 14.sp, color = c.textDim, lineHeight = 20.sp)
         }
         Spacer(Modifier.width(10.dp))
-        if (granted) Row(verticalAlignment = Alignment.CenterVertically) { Ico(Ic.Check, tint = c.ok, size = 17.dp); Spacer(Modifier.width(4.dp)); Txt("On", size = 14.sp, color = c.ok) }
-        else Box(Modifier.clip(Oc.pill).background(c.text).tap(onClick = onAsk).padding(horizontal = 16.dp, vertical = 8.dp)) { Txt("Allow", size = 14.sp, color = c.bg, weight = FontWeight.Medium) }
+        if (granted) Row(verticalAlignment = Alignment.CenterVertically) { Ico(Ic.Check, tint = c.ok, size = 17.dp); Spacer(Modifier.width(4.dp)); Txt(S.on, size = 14.sp, color = c.ok) }
+        else Box(Modifier.clip(Oc.pill).background(c.text).tap(onClick = onAsk).padding(horizontal = 16.dp, vertical = 8.dp)) { Txt(SMisc.allow, size = 14.sp, color = c.bg, weight = FontWeight.Medium) }
     }
 }
 
@@ -339,19 +341,19 @@ private fun AccountStep(rt: RuntimeState, chosen: String?, onPick: (String) -> U
     val c = Oc.c
     val ready = rt is RuntimeState.Running
     Scroll {
-        StepTitle("Connect an account", "Free models work without one. Sign in to unlock more — keys stay on this phone.")
+        StepTitle(SMisc.connectAccountTitle, SMisc.connectAccountSub)
         Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            AccountOption("free", chosen, ready, Ic.Sparkle, "Start free", "No account — free models right away", primary = true, onPick = onPick)
-            AccountOption("github", chosen, ready, Ic.GitHub, "Continue with GitHub", "Copilot's free models", onPick = onPick)
-            AccountOption("opencode", chosen, ready, Ic.Key, "OpenCode account", "Zen and Go plans", onPick = onPick)
+            AccountOption("free", chosen, ready, Ic.Sparkle, SMisc.startFree, SMisc.startFreeSub, primary = true, onPick = onPick)
+            AccountOption("github", chosen, ready, Ic.GitHub, SMisc.continueGitHub, SMisc.copilotFreeModels, onPick = onPick)
+            AccountOption("opencode", chosen, ready, Ic.Key, SMisc.openCodeAccount, SMisc.zenGoPlans, onPick = onPick)
         }
         if (rt is RuntimeState.InstallFailed) {
             Txt(rt.message, Modifier.padding(horizontal = 24.dp, vertical = 16.dp), size = 14.sp, color = c.danger, lineHeight = 20.sp)
             Box(Modifier.padding(horizontal = 20.dp).fillMaxWidth().height(50.dp).clip(Oc.pill).border(1.dp, c.border, Oc.pill).tap { Graph.scope.launch { Graph.runtime.install() } }, contentAlignment = Alignment.Center) {
-                Txt("Retry setup", size = 16.sp)
+                Txt(SMisc.retrySetup, size = 16.sp)
             }
         } else if (chosen != null && !ready) {
-            Txt("Almost there — it opens as soon as setup finishes.", Modifier.padding(24.dp), size = 14.sp, color = c.textDim, align = TextAlign.Center)
+            Txt(SMisc.almostThere, Modifier.padding(24.dp), size = 14.sp, color = c.textDim, align = TextAlign.Center)
         }
     }
 }
@@ -371,7 +373,7 @@ private fun AccountOption(id: String, chosen: String?, ready: Boolean, icon: Ima
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
             Txt(title, size = 17.sp, color = fg, weight = FontWeight.Medium)
-            Txt(if (waiting) "Waiting for setup…" else sub, size = 13.sp, color = if (primary) c.bg.copy(alpha = 0.7f) else c.textDim)
+            Txt(if (waiting) SMisc.waitingForSetup else sub, size = 13.sp, color = if (primary) c.bg.copy(alpha = 0.7f) else c.textDim)
         }
         if (waiting) com.cl0de.app.ui.components.Spinner(18.dp, color = fg, stroke = 2.dp)
     }
@@ -382,11 +384,11 @@ private fun AccountOption(id: String, chosen: String?, ready: Boolean, icon: Ima
 private class TourPage(val say: String, val note: String)
 
 private val TOUR_PAGES = listOf(
-    TourPage("Hi! I'm Cl0de.", "A little cloud that lives on your phone. I write code, run it and chat with you — all right here, no computer needed."),
-    TourPage("Just ask.", "While I work, tap the summary line to see every step: the commands I run, the files I edit, the live terminal."),
-    TourPage("Got a computer?", "Run one command on it and scan the QR code in Remote devices — then I work there too, right from this phone."),
-    TourPage("I don't work alone.", "For big tasks I can call helpers and run them in parallel. And I can remember what matters to you — only if you want."),
-    TourPage("Let's be friends.", "Tap me, hold me, pet me. Waiting for a task? Visit my room — I'm undefeated at ping-pong. Mostly."),
+    TourPage(SMisc.tour1Say, SMisc.tour1Note),
+    TourPage(SMisc.tour2Say, SMisc.tour2Note),
+    TourPage(SMisc.tour3Say, SMisc.tour3Note),
+    TourPage(SMisc.tour4Say, SMisc.tour4Note),
+    TourPage(SMisc.tour5Say, SMisc.tour5Note),
 )
 
 @Composable
@@ -419,7 +421,7 @@ private fun TourPicture(i: Int) {
     when (i) {
         1 -> Column(Modifier.fillMaxWidth().clip(Oc.round(14.dp)).border(1.dp, c.border, Oc.round(14.dp)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Txt("Ran 2 commands, edited ", size = 14.sp, color = c.textDim); Txt("app.py", size = 14.sp)
+                Txt(SMisc.ranCommandsEdited, size = 14.sp, color = c.textDim); Txt("app.py", size = 14.sp)
                 Txt(" +12", size = 14.sp, color = c.ok); Txt(" −3", size = 14.sp, color = c.danger)
                 Spacer(Modifier.width(4.dp)); Ico(Ic.ChevronRight, tint = c.textDim, size = 14.dp)
             }
@@ -433,14 +435,14 @@ private fun TourPicture(i: Int) {
                 for (y in 0 until n) for (x in 0 until n) if (bits[(y * n + x) % bits.length] == '1') drawRect(c.text, androidx.compose.ui.geometry.Offset(x * px, y * px), androidx.compose.ui.geometry.Size(px, px))
             }
             Spacer(Modifier.width(14.dp))
-            Txt("Remote devices → Add device\n→ Scan QR code", size = 14.sp, color = c.textDim, lineHeight = 20.sp)
+            Txt(SMisc.remoteDevicesAddScan, size = 14.sp, color = c.textDim, lineHeight = 20.sp)
         }
         3 -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TourChip(Ic.Users, "Team · 2 working")
-            TourChip(Ic.Scroll, "Memory")
+            TourChip(Ic.Users, SMisc.team2Working)
+            TourChip(Ic.Scroll, SMisc.memory)
         }
         4 -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TourChip(Ic.Sparkle, "Pet me")
+            TourChip(Ic.Sparkle, SMisc.petMe)
             TourChip(Ic.Play, "Ping-pong")
         }
         else -> Unit
@@ -467,14 +469,14 @@ private fun SetupStep(icon: String, onIcon: (String) -> Unit) {
     var persona by remember { mutableStateOf(p.mascotPersona) }
     var outfits by remember { mutableStateOf(p.mascotOutfit != "off") }
     Scroll {
-        StepTitle("Make it yours", "All of this lives in Settings too — change it whenever you like.")
-        Txt("Theme", Modifier.padding(horizontal = 24.dp), size = 14.sp, color = c.textDim)
+        StepTitle(SMisc.makeItYoursTitle, SMisc.makeItYoursSub)
+        Txt(SMisc.theme, Modifier.padding(horizontal = 24.dp), size = 14.sp, color = c.textDim)
         Spacer(Modifier.height(8.dp))
         Box(Modifier.padding(horizontal = 20.dp)) {
-            com.cl0de.app.ui.components.Segmented(listOf("system" to "System", "dark" to "Dark", "light" to "Light"), mode, { mode = it; p.colorMode = it })
+            com.cl0de.app.ui.components.Segmented(listOf("system" to SMisc.systemLabel, "dark" to SMisc.darkLabel, "light" to SMisc.lightLabel), mode, { mode = it; p.colorMode = it })
         }
         Spacer(Modifier.height(22.dp))
-        Txt("Icon on your home screen", Modifier.padding(horizontal = 24.dp), size = 14.sp, color = c.textDim)
+        Txt(SMisc.iconOnHomeScreen, Modifier.padding(horizontal = 24.dp), size = 14.sp, color = c.textDim)
         Spacer(Modifier.height(10.dp))
         Row(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             AppIcons.all.filter { it.id == "look_cloud" || it.id == "cloud_light" }.forEach { ic ->
@@ -483,16 +485,16 @@ private fun SetupStep(icon: String, onIcon: (String) -> Unit) {
                     Box(Modifier.size(64.dp).clip(CircleShape).background(ic.bg).border(if (sel) 3.dp else 1.dp, if (sel) c.link else c.border, CircleShape), contentAlignment = Alignment.Center) {
                         androidx.compose.foundation.Image(painterResource(ic.fgRes), null, Modifier.requiredSize(96.dp))
                     }
-                    Txt(if (ic.id == "cloud_light") "Light" else "Dark", Modifier.padding(top = 6.dp), size = 13.sp, color = if (sel) c.link else c.text)
+                    Txt(if (ic.id == "cloud_light") SMisc.lightLabel else SMisc.darkLabel, Modifier.padding(top = 6.dp), size = 13.sp, color = if (sel) c.link else c.text)
                 }
             }
         }
         Spacer(Modifier.height(18.dp))
         Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SetupSwitch(Ic.Vibrate, "Vibration", "A light tap when you press things", haptics) { haptics = it; p.haptics = it }
-            SetupSwitch(Ic.Cloud, "Cl0de on the home screen", "The cloud that greets you", mascot) { mascot = it; p.mascotOn = it }
-            SetupSwitch(Ic.Chat, "The assistant is Cl0de", "It knows its name and where it lives; names its real model when asked", persona) { persona = it; p.mascotPersona = it }
-            SetupSwitch(Ic.Sparkle, "Holiday outfits", "Hats, snow and confetti on the right days", outfits) { outfits = it; p.mascotOutfit = if (it) "auto" else "off" }
+            SetupSwitch(Ic.Vibrate, SMisc.vibration, SMisc.vibrationSub, haptics) { haptics = it; p.haptics = it }
+            SetupSwitch(Ic.Cloud, SMisc.cl0deOnHome, SMisc.cl0deOnHomeSub, mascot) { mascot = it; p.mascotOn = it }
+            SetupSwitch(Ic.Chat, SMisc.assistantIsCl0de, SMisc.assistantIsCl0deSub, persona) { persona = it; p.mascotPersona = it }
+            SetupSwitch(Ic.Sparkle, SMisc.holidayOutfits, SMisc.holidayOutfitsSub, outfits) { outfits = it; p.mascotOutfit = if (it) "auto" else "off" }
         }
     }
 }
@@ -537,7 +539,7 @@ private fun EnterCloud(onDone: () -> Unit) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Appear(shown, 0) {
                 Box(Modifier.graphicsLayer { alpha = (2f - zoom.value).coerceIn(0f, 1f) }.clip(Oc.round(18.dp)).background(c.surface).border(1.dp, c.border, Oc.round(18.dp)).padding(horizontal = 18.dp, vertical = 12.dp)) {
-                    Txt("Come on in —\nwelcome to my dev environment!", size = 19.sp, weight = FontWeight.SemiBold, align = TextAlign.Center, lineHeight = 26.sp)
+                    Txt(SMisc.enterCloudText, size = 19.sp, weight = FontWeight.SemiBold, align = TextAlign.Center, lineHeight = 26.sp)
                 }
             }
             Spacer(Modifier.height(28.dp))

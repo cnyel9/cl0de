@@ -29,6 +29,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SSet
 import com.cl0de.app.data.UsageWindow
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.components.IconBtn
@@ -47,14 +49,14 @@ import com.cl0de.app.ui.theme.Oc
 import kotlinx.coroutines.launch
 
 private fun resetText(w: UsageWindow): String {
-    val at = w.resetAt ?: return "No usage in this window"
+    val at = w.resetAt ?: return SSet.noUsageInWindow
     val ms = at - System.currentTimeMillis()
-    if (ms <= 0) return "Resetting now"
+    if (ms <= 0) return SSet.resettingNow
     val min = ms / 60_000
-    return "Frees up in " + when {
-        min < 60 -> "$min min"
-        min < 60 * 48 -> "${min / 60} hr ${min % 60} min"
-        else -> "${min / 1440} d ${(min % 1440) / 60} hr"
+    return when {
+        min < 60 -> SSet.freesUpMinutes(min)
+        min < 60 * 48 -> SSet.freesUpHours(min / 60, min % 60)
+        else -> SSet.freesUpDays(min / 1440, (min % 1440) / 60)
     }
 }
 
@@ -67,7 +69,7 @@ private fun UsageCard(title: String, w: UsageWindow) {
     Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(Oc.round(24.dp)).background(c.surface).padding(horizontal = 20.dp, vertical = 18.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Txt(title, size = 21.sp, modifier = Modifier.weight(1f))
-            Txt(if (pct > 0 && pct < 1) "<1% used" else "%.0f%% used".format(pct), size = 17.sp, color = c.textDim)
+            Txt(if (pct > 0 && pct < 1) SSet.lessThanOnePctUsed else SSet.pctUsed(pct), size = 17.sp, color = c.textDim)
         }
         Spacer(Modifier.height(14.dp))
         UsageBar(w.fraction.toFloat(), warn = pct >= 85)
@@ -91,47 +93,45 @@ fun UsageScreen(nav: Nav) {
     LaunchedEffect(Unit) { Graph.usage.recompute(); runCatching { Graph.usage.backfill() } }
 
     Column(Modifier.fillMaxSize().screenBackdrop("UsageScreen1")) {
-        TopBar("Usage", left = { IconBtn(Ic.Back, { nav.pop() }) }, right = { IconBtn(Ic.Info, { info = true }) })
+        TopBar(SSet.usage, left = { IconBtn(Ic.Back, { nav.pop() }) }, right = { IconBtn(Ic.Info, { info = true }) })
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding().padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            UsageCard("Current session · 5 hours", snap.fiveHour)
-            SectionLabel("Weekly limits", Modifier.padding(bottom = 0.dp))
-            UsageCard("Last 7 days", snap.week)
-            SectionLabel("Monthly limits", Modifier.padding(bottom = 0.dp))
-            UsageCard("Last 30 days", snap.month)
+            UsageCard(SSet.currentSession5Hours, snap.fiveHour)
+            SectionLabel(SSet.weeklyLimits, Modifier.padding(bottom = 0.dp))
+            UsageCard(SSet.last7Days, snap.week)
+            SectionLabel(SSet.monthlyLimits, Modifier.padding(bottom = 0.dp))
+            UsageCard(SSet.last30Days, snap.month)
 
-            SectionLabel("Models · last 30 days", Modifier.padding(bottom = 0.dp))
+            SectionLabel(SSet.modelsLast30Days, Modifier.padding(bottom = 0.dp))
             if (snap.byModel.isEmpty()) {
                 Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(Oc.round(24.dp)).background(c.surface).padding(20.dp)) {
-                    Txt("No paid usage yet", size = 20.sp)
-                    Txt("Once the agent answers, each model's cost shows up here.", size = 16.sp, color = c.textDim, modifier = Modifier.padding(top = 4.dp))
+                    Txt(SSet.noPaidUsageYet, size = 20.sp)
+                    Txt(SSet.onceAgentAnswers, size = 16.sp, color = c.textDim, modifier = Modifier.padding(top = 4.dp))
                 }
             } else {
                 SettingsGroup {
                     snap.byModel.take(12).forEach { m ->
                         SettingsRow(
-                            title = m.model.ifBlank { "unknown" }, subtitle = "${m.provider} · ${m.messages} replies · ${"%.1f".format(m.tokens / 1000.0)}k tokens",
+                            title = m.model.ifBlank { SSet.unknown }, subtitle = SSet.modelUsageSubtitle(m.provider, m.messages, "%.1f".format(m.tokens / 1000.0)),
                             trailing = { Txt(money(m.cost), size = 17.sp) },
                         )
                     }
                 }
             }
             Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                SmallButton("Edit limits", { edit = true })
-                SmallButton(if (refreshing) "Refreshing…" else "Refresh", { scope.launch { Graph.usage.backfill() } })
+                SmallButton(SSet.editLimits, { edit = true })
+                SmallButton(if (refreshing) SSet.refreshing else SSet.refresh, { scope.launch { Graph.usage.backfill() } })
                 if (refreshing) Spinner(18.dp, stroke = 2.dp)
             }
             Txt(
-                "Tracked from ${snap.tracked} replies on this device. Totals for the last 30 days: ${money(snap.totalMonth)}.",
+                SSet.trackedFromText(snap.tracked, money(snap.totalMonth)),
                 size = 14.sp, color = c.textDim, modifier = Modifier.padding(horizontal = 20.dp), lineHeight = 20.sp,
             )
         }
     }
 
-    if (info) OcDialog("How this is counted", { info = false }) {
+    if (info) OcDialog(SSet.howCounted, { info = false }) {
         Txt(
-            "OpenCode has no public API for the remaining Go allowance, so the app adds up the cost of every reply that passed through this phone's server " +
-                "over rolling windows of 5 hours, 7 days and 30 days, and compares it with the limits you set (defaults are the published Go limits: " +
-                "\$12 / \$30 / \$60). Usage from other devices or the website is not included — the official numbers live at opencode.ai/console.",
+            SSet.howCountedBody,
             size = 15.sp, color = Oc.c.textDim, lineHeight = 22.sp,
         )
     }
@@ -145,15 +145,15 @@ private fun EditLimitsDialog(onDone: () -> Unit) {
     var w by remember { mutableStateOf(p.limitWeek.toString().removeSuffix(".0")) }
     var m by remember { mutableStateOf(p.limitMonth.toString().removeSuffix(".0")) }
     var prov by remember { mutableStateOf(p.limitProviders) }
-    OcDialog("Limits (USD)", onDone, "Save", {
+    OcDialog(SSet.limitsUsd, onDone, S.save, {
         a.toDoubleOrNull()?.let { p.limit5h = it }; w.toDoubleOrNull()?.let { p.limitWeek = it }; m.toDoubleOrNull()?.let { p.limitMonth = it }
         p.limitProviders = prov; Graph.usage.recompute(); onDone()
     }) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Txt("5 hours", size = 14.sp, color = Oc.c.textDim); OcTextField(a, { a = it }, keyboardType = KeyboardType.Decimal)
-            Txt("7 days", size = 14.sp, color = Oc.c.textDim); OcTextField(w, { w = it }, keyboardType = KeyboardType.Decimal)
-            Txt("30 days", size = 14.sp, color = Oc.c.textDim); OcTextField(m, { m = it }, keyboardType = KeyboardType.Decimal)
-            Txt("Providers counted (comma separated, empty = all)", size = 14.sp, color = Oc.c.textDim); OcTextField(prov, { prov = it })
+            Txt(SSet.fiveHours, size = 14.sp, color = Oc.c.textDim); OcTextField(a, { a = it }, keyboardType = KeyboardType.Decimal)
+            Txt(SSet.sevenDays, size = 14.sp, color = Oc.c.textDim); OcTextField(w, { w = it }, keyboardType = KeyboardType.Decimal)
+            Txt(SSet.thirtyDays, size = 14.sp, color = Oc.c.textDim); OcTextField(m, { m = it }, keyboardType = KeyboardType.Decimal)
+            Txt(SSet.providersCounted, size = 14.sp, color = Oc.c.textDim); OcTextField(prov, { prov = it })
         }
     }
 }

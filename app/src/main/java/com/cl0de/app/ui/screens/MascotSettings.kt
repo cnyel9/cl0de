@@ -22,6 +22,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SMisc
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.Route
 import com.cl0de.app.ui.components.Holiday
@@ -59,55 +61,55 @@ fun MascotSettings(nav: Nav) {
                 Box(Modifier.fillMaxWidth().height(170.dp), contentAlignment = Alignment.Center) {
                     PixelCloud(Modifier.size(width = 150.dp, height = 102.dp))
                 }
-                Txt("Tap, hold, pet or shake — try it here.", size = 13.sp, color = c.textDim, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 8.dp))
+                Txt(SMisc.mascotTryHere, size = 13.sp, color = c.textDim, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 8.dp))
 
                 SettingsGroup {
-                    SettingsRow("Show on the home screen", icon = Ic.Cloud, trailing = { OcSwitch(p.mascotOn, toggle { p.mascotOn = it }) })
-                    SettingsRow("Room", subtitle = "Chat with Cl0de and play ping-pong", icon = Ic.Play, chevron = true, onClick = { nav.push(Route.Mascot) })
+                    SettingsRow(SMisc.showOnHomeScreen, icon = Ic.Cloud, trailing = { OcSwitch(p.mascotOn, toggle { p.mascotOn = it }) })
+                    SettingsRow(SMisc.room, subtitle = SMisc.roomSub, icon = Ic.Play, chevron = true, onClick = { nav.push(Route.Mascot) })
                 }
 
-                SectionLabel("In chats")
+                SectionLabel(SMisc.inChats)
                 SettingsGroup {
-                    SettingsRow("The assistant is Cl0de", subtitle = "Knows its name, that it's a cloud living in this app, and names its real model when asked", icon = Ic.Chat,
+                    SettingsRow(SMisc.assistantIsCl0de, subtitle = SMisc.assistantIsCl0deSubLong, icon = Ic.Chat,
                         trailing = { OcSwitch(p.mascotPersona, toggle { p.mascotPersona = it }) })
                 }
 
-                SectionLabel("Reacts to")
+                SectionLabel(SMisc.reactsTo)
                 SettingsGroup {
-                    SettingsRow("Vibration", subtitle = "Taps, pets and ping-pong", icon = Ic.Vibrate, trailing = { OcSwitch(p.mascotHaptics, toggle { p.mascotHaptics = it }) })
-                    SettingsRow("Shake, tilt and upside down", subtitle = "Uses the motion sensor while visible", icon = Ic.Phone, trailing = { OcSwitch(p.mascotSensors, toggle { p.mascotSensors = it }) })
-                    SettingsRow("Charging and low battery", icon = Ic.Zap, trailing = { OcSwitch(p.mascotBattery, toggle { p.mascotBattery = it }) })
-                    SettingsRow("Dozes off when left alone", icon = Ic.Moon, trailing = { OcSwitch(p.mascotSleepy, toggle { p.mascotSleepy = it }) })
-                    SettingsRow("Morning stretch", subtitle = "First launch of the day", icon = Ic.Sun, trailing = { OcSwitch(p.mascotMorning, toggle { p.mascotMorning = it }) })
+                    SettingsRow(SMisc.vibration, subtitle = SMisc.vibrationSubMascot, icon = Ic.Vibrate, trailing = { OcSwitch(p.mascotHaptics, toggle { p.mascotHaptics = it }) })
+                    SettingsRow(SMisc.shakeTilt, subtitle = SMisc.shakeTiltSub, icon = Ic.Phone, trailing = { OcSwitch(p.mascotSensors, toggle { p.mascotSensors = it }) })
+                    SettingsRow(SMisc.chargingLowBattery, icon = Ic.Zap, trailing = { OcSwitch(p.mascotBattery, toggle { p.mascotBattery = it }) })
+                    SettingsRow(SMisc.dozesOff, icon = Ic.Moon, trailing = { OcSwitch(p.mascotSleepy, toggle { p.mascotSleepy = it }) })
+                    SettingsRow(SMisc.morningStretch, subtitle = SMisc.morningStretchSub, icon = Ic.Sun, trailing = { OcSwitch(p.mascotMorning, toggle { p.mascotMorning = it }) })
                 }
 
-                SectionLabel("Outfits")
+                SectionLabel(SMisc.outfits)
                 SettingsGroup {
-                    SettingsRow("Outfit", subtitle = outfitLabel(p.mascotOutfit), icon = Ic.Sparkle, chevron = true, onClick = { outfitSheet = true })
-                    SettingsRow("Snow, leaves and confetti", subtitle = "And the odd autumn sneeze", icon = Ic.Drop, trailing = { OcSwitch(p.mascotSeasonal, toggle { p.mascotSeasonal = it }) })
+                    SettingsRow(SMisc.outfit, subtitle = outfitLabel(p.mascotOutfit), icon = Ic.Sparkle, chevron = true, onClick = { outfitSheet = true })
+                    SettingsRow(SMisc.snowLeaves, subtitle = SMisc.snowLeavesSub, icon = Ic.Drop, trailing = { OcSwitch(p.mascotSeasonal, toggle { p.mascotSeasonal = it }) })
                 }
 
-                SectionLabel("Together")
+                SectionLabel(SMisc.together)
                 SettingsGroup {
                     val pets = p.petCount
-                    SettingsRow("Petted", subtitle = "$pets ${if (pets == "1") "time" else "times"}", icon = Ic.Sparkle)
-                    SettingsRow("Best ping-pong rally", subtitle = p.pongBest, icon = Ic.ListCheck)
-                    SettingsRow("Reset", icon = Ic.Refresh, titleColor = c.danger, onClick = { p.petCount = "0"; p.pongBest = "0"; rev++ })
+                    SettingsRow(SMisc.pettedLabel, subtitle = SMisc.timesCount(pets), icon = Ic.Sparkle)
+                    SettingsRow(SMisc.bestRally, subtitle = p.pongBest, icon = Ic.ListCheck)
+                    SettingsRow(SMisc.reset, icon = Ic.Refresh, titleColor = c.danger, onClick = { p.petCount = "0"; p.pongBest = "0"; rev++ })
                 }
             }
         }
     }
 
-    if (outfitSheet) PickerFrame("Outfit", { outfitSheet = false }) {
+    if (outfitSheet) PickerFrame(SMisc.outfit, { outfitSheet = false }) {
         fun pick(v: String) { p.mascotOutfit = v; outfitSheet = false; rev++ }
-        PickRow("By date", { pick("auto") }, selected = p.mascotOutfit == "auto")
-        PickRow("None", { pick("off") }, selected = p.mascotOutfit == "off")
+        PickRow(SMisc.byDate, { pick("auto") }, selected = p.mascotOutfit == "auto")
+        PickRow(S.none, { pick("off") }, selected = p.mascotOutfit == "off")
         Holiday.wardrobe.forEach { (label, h) -> PickRow(label, { pick(h.name) }, selected = p.mascotOutfit == h.name) }
     }
 }
 
 private fun outfitLabel(v: String): String = when (v) {
-    "auto" -> "By date" + (Holiday.now()?.let { h -> Holiday.wardrobe.firstOrNull { it.second == h }?.first?.let { " · $it today" } } ?: "")
-    "off" -> "None"
+    "auto" -> SMisc.byDate + (Holiday.now()?.let { h -> Holiday.wardrobe.firstOrNull { it.second == h }?.first?.let { SMisc.outfitToday(it) } } ?: "")
+    "off" -> S.none
     else -> Holiday.wardrobe.firstOrNull { it.second.name == v }?.first ?: v
 }

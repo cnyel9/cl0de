@@ -54,6 +54,8 @@ import com.cl0de.app.api.arr
 import com.cl0de.app.api.obj
 import com.cl0de.app.api.str
 import com.cl0de.app.data.ChatMessage
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SChat
 import com.cl0de.app.ui.components.CodeBlock
 import com.cl0de.app.ui.components.Ico
 import com.cl0de.app.ui.components.IconBtn
@@ -143,7 +145,7 @@ fun UserBubble(m: ChatMessage, onImage: (String) -> Unit, onSelect: () -> Unit, 
                 }
                 // Notebook: no bubble, a label and text with a bar on the left
                 "plain" -> Column(Modifier.fillMaxWidth().longPress(onLong)) {
-                    Txt("YOU · " + hhmm(m.info.time.created), size = 11.sp, color = c.textDim, family = Oc.label)
+                    Txt(SChat.youPrefix + hhmm(m.info.time.created), size = 11.sp, color = c.textDim, family = Oc.label)
                     Row(Modifier.padding(top = 4.dp).height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
                         Box(Modifier.width(2.dp).fillMaxHeight().background(c.accent)); Spacer(Modifier.width(12.dp))
                         Text(text, color = c.text, fontSize = 17.sp, lineHeight = 25.sp, fontFamily = Oc.body, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
@@ -153,7 +155,7 @@ fun UserBubble(m: ChatMessage, onImage: (String) -> Unit, onSelect: () -> Unit, 
                 "card" -> Column(Modifier.widthIn85().clip(Oc.round(18.dp)).background(c.surface).border(1.dp, c.border, Oc.round(18.dp)).longPress(onLong).padding(14.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(6.dp).clip(CircleShape).background(c.accent)); Spacer(Modifier.width(8.dp))
-                        Txt("You", size = 13.sp, color = c.textDim, weight = FontWeight.Medium); Spacer(Modifier.width(6.dp)); Txt(hhmm(m.info.time.created), size = 12.sp, color = c.textDim)
+                        Txt(SChat.youCard, size = 13.sp, color = c.textDim, weight = FontWeight.Medium); Spacer(Modifier.width(6.dp)); Txt(hhmm(m.info.time.created), size = 12.sp, color = c.textDim)
                     }
                     Text(text, color = c.text, fontSize = 16.sp, lineHeight = 23.sp, fontFamily = Oc.body, modifier = Modifier.padding(top = 6.dp))
                 }
@@ -172,9 +174,9 @@ fun UserBubble(m: ChatMessage, onImage: (String) -> Unit, onSelect: () -> Unit, 
                     @Composable fun row(icon: ImageVector, label: String, act: () -> Unit) = androidx.compose.material3.DropdownMenuItem(
                         text = { Txt(label, size = 16.sp) }, leadingIcon = { Ico(icon, tint = c.textDim, size = 20.dp) }, onClick = { menu = false; act() },
                     )
-                    row(Ic.Copy, "Copy message") { clip.setText(AnnotatedString(text)); Graph.chats.toasts.tryEmit("Copied") }
-                    row(Ic.TextSelect, "Select text", onSelect)
-                    row(Ic.Edit, "Edit", onEdit)
+                    row(Ic.Copy, SChat.copyMessage) { clip.setText(AnnotatedString(text)); Graph.chats.toasts.tryEmit(S.copied) }
+                    row(Ic.TextSelect, SChat.selectText, onSelect)
+                    row(Ic.Edit, S.edit, onEdit)
                 }
             }
         }
@@ -210,7 +212,7 @@ fun AssistantBlock(m: ChatMessage, last: Boolean, onImage: (String) -> Unit, onL
             val ctx = androidx.compose.ui.platform.LocalContext.current
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (textAll.isNotBlank()) {
-                    IconBtn(Ic.Copy, { clip.setText(AnnotatedString(textAll)); Graph.chats.toasts.tryEmit("Copied") }, size = 40.dp, iconSize = 20.dp, tint = c.textDim)
+                    IconBtn(Ic.Copy, { clip.setText(AnnotatedString(textAll)); Graph.chats.toasts.tryEmit(S.copied) }, size = 40.dp, iconSize = 20.dp, tint = c.textDim)
                     IconBtn(Ic.Share, {
                         val i = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, textAll)
                         ctx.startActivity(android.content.Intent.createChooser(i, null).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -225,7 +227,7 @@ fun AssistantBlock(m: ChatMessage, last: Boolean, onImage: (String) -> Unit, onL
                 }
                 if (bits.isNotEmpty()) Txt(bits.joinToString(" · "), size = 13.sp, color = c.textDim)
             }
-            if (last) Txt((if (com.cl0de.app.data.Persona.on) "Cl0de" else "OpenCode") + " can make mistakes. Check important changes.", size = 13.sp, color = c.textDim, modifier = Modifier.padding(top = 2.dp))
+            if (last) Txt(SChat.mistakesNote(if (com.cl0de.app.data.Persona.on) "Cl0de" else "OpenCode"), size = 13.sp, color = c.textDim, modifier = Modifier.padding(top = 2.dp))
         } }
     }
     Column(Modifier.fillMaxWidth()) {
@@ -256,10 +258,10 @@ fun AssistantBlock(m: ChatMessage, last: Boolean, onImage: (String) -> Unit, onL
                 "reasoning" -> if (p.text.isNotBlank()) ReasoningBlock(p)
                 "tool" -> ToolCard(p, onImage)
                 "file" -> if (isImagePart(p)) p.raw.str("url")?.let { u -> ImageThumb(u, 220.dp, { onImage(u) }) }
-                "subtask" -> InfoLine(Ic.Bot, "Subtask: " + (p.raw.str("description") ?: p.raw.str("prompt") ?: ""))
-                "patch" -> InfoLine(Ic.Diff, "Patch · ${p.raw.arr("files")?.size ?: 0} files")
-                "compaction" -> InfoLine(Ic.Sparkle, "Context compacted")
-                "retry" -> InfoLine(Ic.Refresh, "Retrying…")
+                "subtask" -> InfoLine(Ic.Bot, SChat.subtaskPrefix + (p.raw.str("description") ?: p.raw.str("prompt") ?: ""))
+                "patch" -> InfoLine(Ic.Diff, SChat.patchFiles(p.raw.arr("files")?.size ?: 0))
+                "compaction" -> InfoLine(Ic.Sparkle, SChat.contextCompacted)
+                "retry" -> InfoLine(Ic.Refresh, SChat.retrying)
             }
         }
         val outFiles = remember(parts.size, parts.lastOrNull()?.text?.length, info.time.completed) {
@@ -318,7 +320,7 @@ private fun ErrorCard(name: String?, message: String) {
     Row(Modifier.fillMaxWidth().clip(Oc.round(18.dp)).background(c.danger.copy(alpha = .12f)).border(1.dp, c.danger.copy(alpha = .35f), Oc.round(18.dp)).padding(14.dp)) {
         Ico(Ic.Warning, tint = c.danger, size = 22.dp); Spacer(Modifier.width(12.dp))
         Column {
-            if (name == "ProviderAuthError") Txt("Provider not connected", size = 15.sp, color = c.danger, weight = FontWeight.Medium)
+            if (name == "ProviderAuthError") Txt(SChat.providerNotConnected, size = 15.sp, color = c.danger, weight = FontWeight.Medium)
             Txt(message, size = 15.sp, color = c.text)
         }
     }
@@ -332,7 +334,7 @@ private fun ReasoningBlock(p: Part) {
         Row(Modifier.clip(Oc.round(10.dp)).clickable { open = !open }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             if (Oc.look.id == "cloud") com.cl0de.app.ui.components.MiniCloudIcon(16.dp) else Ico(Ic.Cloud, tint = c.textDim, size = 16.dp)
             Spacer(Modifier.width(8.dp))
-            Txt("Thinking", size = 14.sp, color = c.textDim)
+            Txt(SChat.thinkingLabel, size = 14.sp, color = c.textDim)
             Spacer(Modifier.width(4.dp))
             Ico(if (open) Ic.ChevronDown else Ic.ChevronRight, tint = c.textDim, size = 16.dp)
         }
@@ -390,18 +392,17 @@ internal fun stepsSummary(parts: List<Part>): String {
             else -> other++
         }
     }
-    fun n(k: Int, one: String, many: String) = if (k == 1) one else "$k $many"
     val bits = buildList {
-        if (thought) add("thought")
-        if (team > 0) add("asked " + n(team, "a helper", "helpers"))
-        if (cmd > 0) add("ran " + n(cmd, "a command", "commands"))
-        if (reads.isNotEmpty()) add("read " + n(reads.size, "a file", "files"))
-        if (edits.isNotEmpty()) add("edited " + n(edits.size, "a file", "files"))
-        if (search > 0) add("searched " + n(search, "once", "times"))
-        if (web > 0) add("browsed " + n(web, "a page", "pages"))
-        if (other > 0) add("used " + n(other, "a tool", "tools"))
+        if (thought) add(SChat.stepThought)
+        if (team > 0) add(SChat.stepHelpers(team))
+        if (cmd > 0) add(SChat.stepCommands(cmd))
+        if (reads.isNotEmpty()) add(SChat.stepReads(reads.size))
+        if (edits.isNotEmpty()) add(SChat.stepEdits(edits.size))
+        if (search > 0) add(SChat.stepSearches(search))
+        if (web > 0) add(SChat.stepWeb(web))
+        if (other > 0) add(SChat.stepTools(other))
     }
-    return bits.joinToString(", ").replaceFirstChar { it.uppercase() } + if (failed > 0) " · $failed failed" else ""
+    return bits.joinToString(", ").replaceFirstChar { it.uppercase() } + if (failed > 0) SChat.stepFailedSuffix(failed) else ""
 }
 
 // ---------- tools ----------
@@ -471,7 +472,7 @@ fun ToolCard(p: Part, onImage: (String) -> Unit) {
                 } else {
                     input?.firstStr("command")?.let { CodeBlock(it, "shell") }
                     if (diff != null && diff.isNotBlank()) DiffView(diff)
-                    else if (output.isNotBlank()) CodeBlock(output.take(6000) + if (output.length > 6000) "\n… (${output.length - 6000} more chars)" else "", if (status == "error") "error" else "output")
+                    else if (output.isNotBlank()) CodeBlock(output.take(6000) + if (output.length > 6000) SChat.moreChars(output.length - 6000) else "", if (status == "error") "error" else "output")
                     state?.arr("attachments")?.forEach { a ->
                         val o = a as? JsonObject ?: return@forEach
                         if (o.str("mime")?.startsWith("image/") == true) o.str("url")?.let { u -> ImageThumb(u, 200.dp, { onImage(u) }) }
@@ -529,14 +530,14 @@ fun PermissionCard(r: PermissionReq, directory: String?) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).clip(Oc.round(24.dp)).background(c.surface).border(1.dp, c.border, Oc.round(24.dp)).padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Ico(Ic.Shield, tint = c.warn, size = 22.dp); Spacer(Modifier.width(10.dp))
-            Txt("Permission needed", size = 17.sp, weight = FontWeight.Medium)
+            Txt(SChat.permissionNeeded, size = 17.sp, weight = FontWeight.Medium)
         }
         Txt(r.permission, size = 15.sp, color = c.textDim, modifier = Modifier.padding(top = 8.dp))
         r.patterns.take(3).forEach { Txt(it, size = 14.sp, family = Oc.mono, maxLines = 2, modifier = Modifier.padding(top = 4.dp)) }
         Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SmallButton("Deny", { reply("reject") }, danger = true)
-            SmallButton("Allow once", { reply("once") }, filled = true)
-            SmallButton("Always", { reply("always") })
+            SmallButton(SChat.deny, { reply("reject") }, danger = true)
+            SmallButton(SChat.allowOnce, { reply("once") }, filled = true)
+            SmallButton(SChat.always, { reply("always") })
         }
     }
 }
@@ -570,7 +571,7 @@ fun QuestionPanel(q: QuestionReq, directory: String?) {
         Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 6.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f).padding(vertical = 10.dp)) {
                 if (q.questions.size > 1 || item.header.isNotBlank()) Txt(
-                    listOfNotNull(item.header.takeIf { it.isNotBlank() }, if (q.questions.size > 1) "${page + 1} of ${q.questions.size}" else null).joinToString(" · "),
+                    listOfNotNull(item.header.takeIf { it.isNotBlank() }, if (q.questions.size > 1) SChat.ofPage(page + 1, q.questions.size) else null).joinToString(" · "),
                     size = 13.sp, color = c.textDim,
                 )
                 Txt(item.question, size = 16.sp, lineHeight = 22.sp)
@@ -608,12 +609,12 @@ fun QuestionPanel(q: QuestionReq, directory: String?) {
                     textStyle = androidx.compose.ui.text.TextStyle(color = c.text, fontSize = 16.sp, fontFamily = Oc.body),
                     cursorBrush = androidx.compose.ui.graphics.SolidColor(c.text),
                     modifier = Modifier.weight(1f),
-                    decorationBox = { inner -> Box { if (custom[page].value.isEmpty()) Txt("Something else", size = 16.sp, color = c.textDim); inner() } },
+                    decorationBox = { inner -> Box { if (custom[page].value.isEmpty()) Txt(SChat.somethingElse, size = 16.sp, color = c.textDim); inner() } },
                 )
             } else Spacer(Modifier.weight(1f))
             Spacer(Modifier.width(10.dp))
             val ready = typed || (item.multiple && picked[page].isNotEmpty())
-            SmallButton(if (ready) (if (page < q.questions.lastIndex) "Next" else "Send") else "Skip", { if (ready) next() else skip() }, filled = ready)
+            SmallButton(if (ready) (if (page < q.questions.lastIndex) SChat.nextLabel else S.send) else SChat.skipLabel, { if (ready) next() else skip() }, filled = ready)
         }
     }
 }
@@ -630,14 +631,14 @@ fun PermissionPanel(r: PermissionReq, directory: String?) {
     Column(Modifier.padding(horizontal = 12.dp).fillMaxWidth().clip(Oc.round(22.dp)).background(c.surface).border(1.dp, c.border, Oc.round(22.dp)).padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Ico(Ic.Shield, tint = c.warn, size = 20.dp); Spacer(Modifier.width(10.dp))
-            Txt("Allow ${r.permission}?", size = 16.sp, weight = FontWeight.Medium)
+            Txt(SChat.allowPermission(r.permission), size = 16.sp, weight = FontWeight.Medium)
         }
         r.patterns.take(3).forEach { Txt(it, size = 14.sp, family = Oc.mono, maxLines = 2, color = c.textDim, modifier = Modifier.padding(top = 6.dp)) }
         Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SmallButton("Allow once", { reply("once") }, filled = true)
-            SmallButton("Always", { reply("always") })
+            SmallButton(SChat.allowOnce, { reply("once") }, filled = true)
+            SmallButton(SChat.always, { reply("always") })
             Spacer(Modifier.weight(1f))
-            SmallButton("Deny", { reply("reject") }, danger = true)
+            SmallButton(SChat.deny, { reply("reject") }, danger = true)
         }
     }
 }
@@ -651,10 +652,10 @@ private fun QuestionResult(input: JsonObject?, state: JsonObject?) {
         ((a as? kotlinx.serialization.json.JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull } ?: listOfNotNull((a as? JsonPrimitive)?.contentOrNull)).joinToString(", ")
     }.orEmpty()
     Column(Modifier.fillMaxWidth().clip(Oc.round(18.dp)).background(c.surface).border(1.dp, c.border, Oc.round(18.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Txt("Question", size = 14.sp, color = c.textDim)
+        Txt(SChat.questionLabel, size = 14.sp, color = c.textDim)
         qs.forEachIndexed { i, q ->
             Txt(q, size = 16.sp, color = c.textDim, lineHeight = 22.sp)
-            val a = answers.getOrNull(i)?.takeIf { it.isNotBlank() } ?: if (state?.str("status") == "error") "Skipped" else if (state?.str("status") == "completed") (state.str("output")?.lines()?.lastOrNull { it.isNotBlank() } ?: "") else "Waiting for your answer…"
+            val a = answers.getOrNull(i)?.takeIf { it.isNotBlank() } ?: if (state?.str("status") == "error") SChat.skippedLabel else if (state?.str("status") == "completed") (state.str("output")?.lines()?.lastOrNull { it.isNotBlank() } ?: "") else SChat.waitingAnswer
             Txt(a, size = 16.sp)
         }
     }

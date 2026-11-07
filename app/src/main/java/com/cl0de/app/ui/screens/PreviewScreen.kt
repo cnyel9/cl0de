@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.cl0de.app.Graph
+import com.cl0de.app.data.SMisc
 import com.cl0de.app.api.obj
 import com.cl0de.app.api.str
 import com.cl0de.app.data.PhoneBridge
@@ -107,7 +108,7 @@ fun PreviewScreen(url: String, sessionId: String?, nav: Nav) {
                             override fun onPageStarted(view: WebView, u: String?, favicon: Bitmap?) { loading = true }
                             override fun onPageFinished(view: WebView, u: String?) { loading = false; title = view.title?.takeIf { it.isNotBlank() && !it.startsWith("http") } ?: label(u ?: url) }
                             override fun onReceivedError(view: WebView, req: WebResourceRequest, err: android.webkit.WebResourceError) {
-                                if (req.isForMainFrame) failed = err.description?.toString() ?: "Could not open the page"
+                                if (req.isForMainFrame) failed = err.description?.toString() ?: SMisc.couldNotOpenPage
                             }
                         }
                         loadUrl(url)
@@ -117,21 +118,21 @@ fun PreviewScreen(url: String, sessionId: String?, nav: Nav) {
             )
             failed?.let { msg ->
                 Column(Modifier.fillMaxSize().screenBackdrop("PreviewScreen2").padding(28.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                    Txt("The page didn't open", size = 20.sp)
+                    Txt(SMisc.pageDidntOpen, size = 20.sp)
                     Spacer(Modifier.height(8.dp))
-                    Txt(if (url.contains(":${PhoneBridge.PORT}/")) msg else "$msg\n\nIs the dev server still running? Ask OpenCode to start it again.", size = 15.sp, color = c.textDim, lineHeight = 21.sp, align = androidx.compose.ui.text.style.TextAlign.Center)
+                    Txt(if (url.contains(":${PhoneBridge.PORT}/")) msg else SMisc.devServerHint(msg), size = 15.sp, color = c.textDim, lineHeight = 21.sp, align = androidx.compose.ui.text.style.TextAlign.Center)
                     Spacer(Modifier.height(18.dp))
-                    Pill("Try again", { failed = null; web?.reload() })
+                    Pill(SMisc.tryAgain, { failed = null; web?.reload() })
                 }
             }
         }
         if (sessionId != null) Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(8.dp).clip(CircleShape).background(if (reloads > 0) c.ok else c.textDim))
             Spacer(Modifier.size(8.dp))
-            Txt(if (reloads > 0) "Live · reloaded $reloads×" else "Live · reloads when OpenCode edits files", Modifier.weight(1f), size = 13.sp, color = c.textDim, maxLines = 1)
+            Txt(if (reloads > 0) SMisc.liveReloaded(reloads) else SMisc.liveReloadsHint, Modifier.weight(1f), size = 13.sp, color = c.textDim, maxLines = 1)
             // one button: ask the agent to publish the site and send the link
-            Pill("Publish", {
-                scope.launch { runCatching { Graph.chats.send(ctx, sessionId, "Publish this site to GitHub Pages (create the repo if needed) and send me the link.", emptyList()) } }
+            Pill(SMisc.publish, {
+                scope.launch { runCatching { Graph.chats.send(ctx, sessionId, SMisc.publishPrompt, emptyList()) } }
                 nav.pop()
             })
         }
@@ -140,7 +141,7 @@ fun PreviewScreen(url: String, sessionId: String?, nav: Nav) {
 
 private fun label(u: String): String {
     val uri = Uri.parse(u)
-    return if (uri.port == PhoneBridge.PORT) uri.path.orEmpty().substringAfterLast('/').ifBlank { "Preview" }
+    return if (uri.port == PhoneBridge.PORT) uri.path.orEmpty().substringAfterLast('/').ifBlank { SMisc.preview }
     else "${uri.host}:${uri.port}${uri.path.orEmpty().takeIf { it != "/" }.orEmpty()}"
 }
 

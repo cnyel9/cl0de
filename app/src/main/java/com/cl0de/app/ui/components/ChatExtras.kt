@@ -30,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
 import com.cl0de.app.data.Chat
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SChat
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.Route
 import com.cl0de.app.ui.screens.previewTargets
@@ -55,14 +57,14 @@ fun InterruptedCard(id: String) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Ico(Ic.Warning, tint = c.warn, size = 18.dp); Spacer(Modifier.width(10.dp))
-            Txt(if (look == "hairline") "TASK INTERRUPTED" else "The task was interrupted", size = if (look == "hairline") 12.sp else 16.sp, weight = FontWeight.Medium, family = if (look == "hairline" || look == "terminal") Oc.mono else null)
+            Txt(if (look == "hairline") SChat.taskInterruptedCaps else SChat.taskInterrupted, size = if (look == "hairline") 12.sp else 16.sp, weight = FontWeight.Medium, family = if (look == "hairline" || look == "terminal") Oc.mono else null)
         }
         Spacer(Modifier.height(6.dp))
-        Txt("The server stopped while OpenCode was working, so it didn't finish. Continue from where it stopped?", size = 14.sp, color = c.textDim, lineHeight = 20.sp)
+        Txt(SChat.interruptedExplain, size = 14.sp, color = c.textDim, lineHeight = 20.sp)
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SmallButton("Cancel", { Graph.chats.dismissInterrupted(id) })
-            SmallButton("Continue", { scope.launch { runCatching { Graph.chats.resumeInterrupted(ctx, id) }.onFailure { Graph.chats.toasts.tryEmit(it.message ?: "Could not continue") } } }, filled = true)
+            SmallButton(S.cancel, { Graph.chats.dismissInterrupted(id) })
+            SmallButton(SChat.continueAction, { scope.launch { runCatching { Graph.chats.resumeInterrupted(ctx, id) }.onFailure { Graph.chats.toasts.tryEmit(it.message ?: SChat.couldNotContinue) } } }, filled = true)
         }
     }
 }
@@ -81,10 +83,10 @@ fun InterruptedBanner(onOpen: (String) -> Unit) {
     ) {
         Ico(Ic.Warning, tint = c.warn, size = 17.dp); Spacer(Modifier.width(10.dp))
         Txt(
-            if (ids.size == 1) "Interrupted: " + (Graph.chats.session(ids.first())?.displayTitle ?: "a task") else "${ids.size} tasks were interrupted",
+            if (ids.size == 1) SChat.interruptedOne(Graph.chats.session(ids.first())?.displayTitle ?: SChat.aTask) else SChat.interruptedMany(ids.size),
             Modifier.weight(1f), size = 14.sp, maxLines = 1,
         )
-        Txt("Open", size = 14.sp, color = c.accent)
+        Txt(SChat.openAction, size = 14.sp, color = c.accent)
     }
 }
 
@@ -102,7 +104,7 @@ fun PreviewChips(chat: Chat, id: String, nav: Nav) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Ico(Ic.Play, tint = c.accent, size = 15.dp); Spacer(Modifier.width(7.dp))
-                Txt("Preview $label", size = 14.sp, maxLines = 1)
+                Txt(SChat.previewLabel(label), size = 14.sp, maxLines = 1)
             }
         }
     }
@@ -121,7 +123,7 @@ fun CostHint(chat: Chat?, text: String, attachments: Int) {
     val m = Graph.catalog.model(prefs.providerId, prefs.modelId) ?: return
     fun price(k: String) = m.cost?.get(k)?.jsonPrimitive?.doubleOrNull ?: 0.0
     val pin = price("input"); val pout = price("output"); val pcache = m.cost?.get("cache_read")?.jsonPrimitive?.doubleOrNull ?: pin
-    val hint = if (pin == 0.0 && pout == 0.0) "Free model" else {
+    val hint = if (pin == 0.0 && pout == 0.0) SChat.freeModel else {
         val replies = chat?.messages?.mapNotNull { it.info.tokens?.takeIf { t -> t.output > 0 } }.orEmpty()
         val ctxTokens = replies.lastOrNull()?.let { it.input + it.cache.read + it.cache.write + it.output } ?: 12_000L
         val outAvg = if (replies.isEmpty()) 800L else replies.takeLast(5).map { it.output + it.reasoning }.average().toLong()
@@ -130,7 +132,7 @@ fun CostHint(chat: Chat?, text: String, attachments: Int) {
         val counted = prefs.limitProviders.split(',').map { it.trim() }.let { it.isEmpty() || prefs.providerId in it }
         val share = if (counted && prefs.limit5h > 0) usd / prefs.limit5h * 100 else null
         "≈ " + (if (usd < 0.01) "<$0.01" else "$%.2f".format(java.util.Locale.US, usd)) +
-            (share?.let { " · " + (if (it < 0.1) "<0.1" else "%.1f".format(java.util.Locale.US, it)) + "% of 5h" } ?: "")
+            (share?.let { SChat.fiveHourSuffix(if (it < 0.1) "<0.1" else "%.1f".format(java.util.Locale.US, it)) } ?: "")
     }
     val mod = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 2.dp)
     when (look) {

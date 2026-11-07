@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
 import com.cl0de.app.data.ScheduledTask
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SMisc
 import com.cl0de.app.data.Scheduler
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.components.EmptyState
@@ -58,10 +60,10 @@ fun ScheduledScreen(nav: Nav, onMenu: () -> Unit) {
 
     Box(Modifier.fillMaxSize().screenBackdrop("ScheduledScreen1")) {
         Column(Modifier.fillMaxSize()) {
-            TopBar("Scheduled tasks", left = { IconBtn(Ic.Menu, onMenu) })
+            TopBar(SMisc.scheduledTasks, left = { IconBtn(Ic.Menu, onMenu) })
             if (tasks.isEmpty()) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    EmptyState(Ic.Clock2, "No scheduled tasks yet", "Run a prompt on a schedule, like a daily summary of your project.")
+                    EmptyState(Ic.Clock2, SMisc.noScheduledTasks, SMisc.scheduledTasksHint)
                 }
             } else LazyColumn(contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 120.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(tasks, key = { it.id }) { t ->
@@ -73,15 +75,15 @@ fun ScheduledScreen(nav: Nav, onMenu: () -> Unit) {
                         Column(Modifier.weight(1f)) {
                             Txt(t.title, size = 19.sp, maxLines = 1)
                             Spacer(Modifier.height(4.dp))
-                            Txt("%02d:%02d · %s".format(t.hour, t.minute, when (t.repeat) { "daily" -> "every day"; "weekly" -> "every week"; else -> "once" }), size = 16.sp, color = c.textDim)
+                            Txt("%02d:%02d · %s".format(t.hour, t.minute, SMisc.repeatSuffix(t.repeat)), size = 16.sp, color = c.textDim)
                         }
                         OcSwitch(t.enabled) { Scheduler.upsert(ctx, t.copy(enabled = it)) }
                     }
                 }
             }
-            Txt("Tasks run while the app and the server are alive. The app keeps its server running in the background.", Modifier.padding(horizontal = 24.dp).padding(bottom = 100.dp), size = 13.sp, color = c.textDim)
+            Txt(SMisc.tasksRunNote, Modifier.padding(horizontal = 24.dp).padding(bottom = 100.dp), size = 13.sp, color = c.textDim)
         }
-        Pill("New task", { creating = true }, Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 24.dp), icon = Ic.Plus)
+        Pill(SMisc.newTask, { creating = true }, Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 24.dp), icon = Ic.Plus)
     }
     if (creating) TaskSheet(null) { creating = false }
     edit?.let { t -> TaskSheet(t) { edit = null } }
@@ -95,21 +97,21 @@ private fun TaskSheet(task: ScheduledTask?, onDismiss: () -> Unit) {
     var hour by remember { mutableStateOf((task?.hour ?: 9).toString()) }
     var minute by remember { mutableStateOf((task?.minute ?: 0).toString().padStart(2, '0')) }
     var repeat by remember { mutableStateOf(task?.repeat ?: "daily") }
-    OcSheet(onDismiss, if (task == null) "New task" else "Edit task", skipHalf = false) {
+    OcSheet(onDismiss, if (task == null) SMisc.newTask else SMisc.editTask, skipHalf = false) {
         Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            OcTextField(title, { title = it }, placeholder = "Name")
-            OcTextField(prompt, { prompt = it }, placeholder = "What should OpenCode do?", singleLine = false, minLines = 3)
+            OcTextField(title, { title = it }, placeholder = S.name)
+            OcTextField(prompt, { prompt = it }, placeholder = SMisc.whatShouldDo, singleLine = false, minLines = 3)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Txt("Time", Modifier.weight(1f), size = 17.sp)
+                Txt(SMisc.timeLabel, Modifier.weight(1f), size = 17.sp)
                 OcTextField(hour, { hour = it.filter(Char::isDigit).take(2) }, Modifier.width(70.dp))
                 Txt(" : ", size = 20.sp)
                 OcTextField(minute, { minute = it.filter(Char::isDigit).take(2) }, Modifier.width(70.dp))
             }
-            Segmented(listOf("once" to "Once", "daily" to "Daily", "weekly" to "Weekly"), repeat, { repeat = it }, Modifier.fillMaxWidth())
+            Segmented(listOf("once" to SMisc.onceLabel, "daily" to SMisc.dailyLabel, "weekly" to SMisc.weeklyLabel), repeat, { repeat = it }, Modifier.fillMaxWidth())
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                if (task != null) SmallButton("Delete", { Scheduler.remove(ctx, task.id); onDismiss() }, danger = true)
+                if (task != null) SmallButton(S.delete, { Scheduler.remove(ctx, task.id); onDismiss() }, danger = true)
                 Spacer(Modifier.weight(1f))
-                SmallButton("Save", {
+                SmallButton(S.save, {
                     if (prompt.isBlank()) return@SmallButton
                     Scheduler.upsert(ctx, ScheduledTask(
                         task?.id ?: java.util.UUID.randomUUID().toString().take(8), title.ifBlank { prompt.take(30) }, prompt.trim(),

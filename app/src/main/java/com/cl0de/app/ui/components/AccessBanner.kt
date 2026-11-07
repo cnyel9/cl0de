@@ -30,6 +30,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.cl0de.app.Graph
+import com.cl0de.app.data.SSet
 import com.cl0de.app.ui.theme.Ic
 import com.cl0de.app.ui.theme.Oc
 
@@ -56,9 +57,9 @@ fun AccessBanner() {
     val battery = ctx.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(ctx.packageName)
     if (notif && battery) return
     val text = when {
-        !battery && !notif -> "Allow background work and notifications so tasks don't stop"
-        !battery -> "Allow background work so long tasks don't stop"
-        else -> "Turn on notifications for answers and Allow / Deny"
+        !battery && !notif -> SSet.allowBackgroundAndNotifications
+        !battery -> SSet.allowBackgroundWork
+        else -> SSet.turnOnNotifications
     }
     Row(
         Modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth().clip(CircleShape).background(c.surface).border(1.dp, c.border, CircleShape)

@@ -50,6 +50,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
+import com.cl0de.app.data.AppLang
+import com.cl0de.app.data.SChat
 import com.cl0de.app.ui.theme.Oc
 import kotlin.math.PI
 import kotlin.math.cos
@@ -232,7 +234,7 @@ private fun TerminalIntro(t: Float) {
             Text(
                 buildAnnotatedString {
                     withStyle(SpanStyle(color = Color(0xFFFAB283))) { append("Build ") }
-                    withStyle(SpanStyle(color = Color(0xFF808080))) { append("· starting the server on this phone…") }
+                    withStyle(SpanStyle(color = Color(0xFF808080))) { append(SChat.startingServer) }
                 },
                 Modifier.graphicsLayer { alpha = info; translationX = (1 - info) * -12.dp.toPx() },
                 fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 13.sp,
@@ -402,7 +404,7 @@ private fun KimiIntro(t: Float) {
                 }
             }
             Spacer(Modifier.height(18.dp))
-            val hi = "Hi, I'm OpenCode"
+            val hi = SChat.hiImOpenCode
             val n = (seg(t, 0.6f, 0.86f) * hi.length).toInt()
             Text(hi.take(n), fontFamily = Oc.heading, fontWeight = FontWeight.SemiBold, fontSize = 24.sp, color = c.text)
         }
@@ -444,7 +446,7 @@ private fun NotebookIntro(t: Float) {
             Spacer(Modifier.height(10.dp))
             val d = seg(t, 0.74f, 0.9f)
             Text(
-                java.text.SimpleDateFormat("EEEE, d MMMM", java.util.Locale.ENGLISH).format(java.util.Date()),
+                java.text.SimpleDateFormat("EEEE, d MMMM", if (AppLang.indonesian()) java.util.Locale("id", "ID") else java.util.Locale.ENGLISH).format(java.util.Date()),
                 Modifier.graphicsLayer { alpha = d }, fontFamily = Oc.reply, fontStyle = FontStyle.Italic, fontSize = 16.sp, color = c.textDim,
             )
         }

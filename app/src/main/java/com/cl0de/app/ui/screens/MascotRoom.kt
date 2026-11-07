@@ -51,6 +51,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
+import com.cl0de.app.data.SMisc
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.components.CH
 import com.cl0de.app.ui.components.CW
@@ -91,8 +92,8 @@ fun MascotRoom(nav: Nav) {
         ) {
             com.cl0de.app.ui.components.Spinner(12.dp, color = c.accent, stroke = 1.5.dp)
             Spacer(Modifier.width(10.dp))
-            Txt("Your task is running", size = 14.sp, color = c.textDim, modifier = Modifier.weight(1f))
-            Txt("Back to chat", size = 14.sp, color = c.accent)
+            Txt(SMisc.yourTaskRunning, size = 14.sp, color = c.textDim, modifier = Modifier.weight(1f))
+            Txt(SMisc.backToChat, size = 14.sp, color = c.accent)
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             if (playing) Pong() else Room { playing = true }
@@ -129,13 +130,13 @@ private fun Room(onPlay: () -> Unit) {
             say(CloudTalk.of(e))
         })
         Spacer(Modifier.height(40.dp))
-        Txt("Petted $pets ${if (pets == 1) "time" else "times"} · best rally ${Graph.prefs.pongBest}", size = 13.sp, color = c.textDim)
+        Txt(SMisc.pettedLine(pets, Graph.prefs.pongBest), size = 13.sp, color = c.textDim)
         Spacer(Modifier.height(14.dp))
         Box(Modifier.clip(CircleShape).background(c.text).tap(scale = 0.96f, onClick = onPlay).padding(horizontal = 22.dp, vertical = 12.dp)) {
-            Txt("Play ping-pong", size = 16.sp, color = c.bg, weight = FontWeight.Medium)
+            Txt(SMisc.playPingPong, size = 16.sp, color = c.bg, weight = FontWeight.Medium)
         }
         Spacer(Modifier.height(10.dp))
-        Txt("Tap, hold, pet or shake the phone", size = 13.sp, color = c.textDim)
+        Txt(SMisc.tapHoldPetShakePhone, size = 13.sp, color = c.textDim)
     }
 }
 
@@ -158,7 +159,7 @@ private fun Pong() {
     var him by remember { mutableIntStateOf(0) }
     var rally by remember { mutableIntStateOf(0) }
     var mood by remember { mutableStateOf(CloudMood.Idle) }
-    var line by remember { mutableStateOf("Ready? Drag to move.") }
+    var line by remember { mutableStateOf(SMisc.readyDrag) }
     LaunchedEffect(mood) { if (mood != CloudMood.Idle) { delay(900); mood = CloudMood.Idle } }
     var serveAt by remember { mutableLongStateOf(System.currentTimeMillis() + 900) }
     val ball = with(d) { 12.dp.toPx() }
@@ -255,7 +256,7 @@ private fun Pong() {
             Txt("$you", size = 28.sp, color = c.text, weight = FontWeight.SemiBold)
         }
         Column(Modifier.align(Alignment.CenterEnd).padding(end = 20.dp), horizontalAlignment = Alignment.End) {
-            Txt("rally $rally", size = 13.sp, color = c.textDim)
+            Txt(SMisc.rallyLabel(rally), size = 13.sp, color = c.textDim)
         }
         AnimatedContent(line, label = "pong-say", modifier = Modifier.align(Alignment.Center).padding(top = 120.dp), transitionSpec = { fadeIn(tween(90)) togetherWith fadeOut(tween(60)) }) { t ->
             Txt(t, size = 15.sp, color = c.textDim)

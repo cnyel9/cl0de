@@ -28,6 +28,8 @@ import com.cl0de.app.Graph
 import com.cl0de.app.api.obj
 import com.cl0de.app.api.str
 import com.cl0de.app.data.PhoneBridge
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SMisc
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.components.IconBtn
 import com.cl0de.app.ui.components.OcSwitch
@@ -57,39 +59,39 @@ fun PhoneToolsScreen(nav: Nav) {
     val off = prefs.phoneToolsOff.split(',').filter { it.isNotBlank() }.toSet()
 
     Column(Modifier.fillMaxSize().screenBackdrop("PhoneToolsScreen1")) {
-        TopBar("Phone tools", left = { IconBtn(Ic.Back, { nav.pop() }) })
+        TopBar(SMisc.phoneTools, left = { IconBtn(Ic.Back, { nav.pop() }) })
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding().padding(bottom = 32.dp)) {
             Txt(
-                "OpenCode runs on this phone, so it can also act on it: remind you, set an alarm, read or fill the clipboard, take a photo, find where you are, put files into Downloads and show the sites it builds.",
+                SMisc.phoneToolsIntro,
                 Modifier.padding(horizontal = 20.dp).padding(bottom = 14.dp), size = 15.sp, color = c.textDim, lineHeight = 21.sp,
             )
             SettingsGroup {
                 SettingsRow(
-                    "Let OpenCode use this phone", icon = Ic.Phone,
+                    SMisc.letOpenCodeUsePhone, icon = Ic.Phone,
                     subtitle = when {
-                        Graph.devices.isRemote -> "Only for the server on this phone"
-                        !prefs.phoneTools -> "Off"
-                        status == "connected" -> "Connected · ${PhoneBridge.enabledTools().size} tools"
-                        status == null -> "Starts with the server"
+                        Graph.devices.isRemote -> SMisc.onlyForThisPhoneServer
+                        !prefs.phoneTools -> S.off
+                        status == "connected" -> SMisc.connectedTools(PhoneBridge.enabledTools().size)
+                        status == null -> SMisc.startsWithServer
                         else -> "Status: $status"
                     },
                     trailing = { OcSwitch(prefs.phoneTools) { prefs.phoneTools = it; scope.launch { PhoneBridge.register(); rev++ } } },
                 )
-                if (!located) SettingsRow("Allow location", subtitle = "Needed for the location tool", icon = Ic.Pin, chevron = true, onClick = {
+                if (!located) SettingsRow(SMisc.allowLocation, subtitle = SMisc.locationToolNeeded, icon = Ic.Pin, chevron = true, onClick = {
                     askLocation.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
                 })
             }
             if (prefs.phoneTools) {
-                SectionLabel("Tools")
+                SectionLabel(SMisc.toolsLabel)
                 SettingsGroup {
                     PhoneBridge.all.forEach { t ->
-                        SettingsRow(t.title, subtitle = t.desc.substringBefore(". ").removeSuffix("."), trailing = {
+                        SettingsRow(SMisc.toolTitle(t.name, t.title), subtitle = SMisc.toolDesc(t.name, t.desc).substringBefore(". ").removeSuffix("."), trailing = {
                             OcSwitch(t.name !in off) { on -> prefs.phoneToolsOff = (if (on) off - t.name else off + t.name).joinToString(",") }
                         })
                     }
                 }
                 Txt(
-                    "Try: “remind me in 20 minutes to stretch”, “take a photo of the board and turn it into notes”, “save the report to Downloads”.\n\nCamera, alarm, clipboard and links work while the app is open: Android doesn't let apps do that from the background.",
+                    SMisc.phoneToolsTry,
                     Modifier.padding(20.dp), size = 13.sp, color = c.textDim, lineHeight = 19.sp,
                 )
             }

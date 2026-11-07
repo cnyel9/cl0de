@@ -45,6 +45,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
 import com.cl0de.app.Graph
+import com.cl0de.app.data.SChat
 import com.cl0de.app.ui.theme.Ic
 import coil3.compose.AsyncImage
 import java.io.File
@@ -131,7 +132,7 @@ private fun saveImage(ctx: Context, url: String) {
     val uri = ctx.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
     if (uri != null) {
         ctx.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
-        Toast.makeText(ctx, "Saved to Pictures/OpenCode", Toast.LENGTH_SHORT).show()
+        Toast.makeText(ctx, SChat.savedToPictures, Toast.LENGTH_SHORT).show()
     }
 }
 

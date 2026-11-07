@@ -43,6 +43,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SChat
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.Route
 import com.cl0de.app.ui.components.ComposerHost
@@ -132,13 +134,13 @@ fun HomeScreen(nav: Nav, onMenu: () -> Unit, code: Boolean = false) {
                                 // anonymous chat: a ghost cloud, nothing is saved
                                 com.cl0de.app.ui.components.GhostCloud(112.dp, eyesLook = state.text.isNotEmpty())
                                 Spacer(Modifier.height(26.dp))
-                                Txt("Anonymous chat", size = 24.sp, weight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                                Txt(SChat.anonymousChat, size = 24.sp, weight = androidx.compose.ui.text.font.FontWeight.SemiBold)
                                 Spacer(Modifier.height(10.dp))
-                                Txt("Nothing is kept: it stays out of your history and memory, and it's deleted as soon as you leave.", Modifier.padding(horizontal = 40.dp), size = 16.sp, color = c.textDim, align = TextAlign.Center, lineHeight = 23.sp)
+                                Txt(SChat.anonymousDesc, Modifier.padding(horizontal = 40.dp), size = 16.sp, color = c.textDim, align = TextAlign.Center, lineHeight = 23.sp)
                             } else {
                             Ico(Ic.Ghost, tint = c.textDim, size = 56.dp)
                             Spacer(Modifier.height(22.dp))
-                            Txt("Incognito chats stay out of your recents and are deleted when you leave them.", Modifier.padding(horizontal = 40.dp), size = 18.sp, color = c.textDim, align = TextAlign.Center)
+                            Txt(SChat.incognitoDesc, Modifier.padding(horizontal = 40.dp), size = 18.sp, color = c.textDim, align = TextAlign.Center)
                             }
                         } else {
                             if (Oc.look.id.kimiLike) {
@@ -168,7 +170,7 @@ fun HomeScreen(nav: Nav, onMenu: () -> Unit, code: Boolean = false) {
             if (Oc.look.id.kimiLike && !ghost && !state.text.startsWith("/")) com.cl0de.app.ui.components.KimiQuickChips(nav, code) { state.text = it }
             ComposerHost(
                 state = state, nav = nav, busy = sending, dashed = ghost,
-                placeholder = if (Oc.look.id.kimiLike) "Ask me. Give me a task." else if (code) "Describe a task…" else "Chat with OpenCode…",
+                placeholder = if (Oc.look.id.kimiLike) SChat.askMePlaceholder else if (code) SChat.describeTask else SChat.chatWithOpenCode,
                 onStop = {},
                 onVoice = if (code || ghost) null else ({ voiceHome = true }),
                 onSend = {
@@ -186,7 +188,7 @@ fun HomeScreen(nav: Nav, onMenu: () -> Unit, code: Boolean = false) {
                             flight.join()
                             nav.openChatInstant(s.id)
                         } catch (e: Exception) {
-                            Graph.chats.toasts.tryEmit(e.message ?: "Could not start the chat")
+                            Graph.chats.toasts.tryEmit(e.message ?: SChat.couldNotStartChat)
                             state.text = text; state.attachments.addAll(atts)
                             flightText = null; prog.snapTo(0f)
                         } finally { sending = false }
@@ -240,40 +242,40 @@ private fun ModeLine(code: Boolean) {
     val model = provider?.models?.get(prefs.modelId)
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(horizontal = 24.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Txt(if (code) prefs.agent.replaceFirstChar { it.uppercase() } else "Chat", size = 15.sp, color = c.link, family = Oc.mono)
+            Txt(if (code) prefs.agent.replaceFirstChar { it.uppercase() } else S.chat, size = 15.sp, color = c.link, family = Oc.mono)
             Txt("  ·  ", size = 15.sp, color = c.textDim, family = Oc.mono)
-            Txt(model?.name?.ifBlank { null } ?: if (providers.isEmpty()) "…" else prefs.modelId.ifBlank { "no model" }, size = 15.sp, family = Oc.mono, maxLines = 1)
+            Txt(model?.name?.ifBlank { null } ?: if (providers.isEmpty()) "…" else prefs.modelId.ifBlank { SChat.noModel }, size = 15.sp, family = Oc.mono, maxLines = 1)
         }
         provider?.let { Txt(it.name, Modifier.padding(top = 4.dp), size = 13.sp, color = c.textDim, family = Oc.mono, maxLines = 1) }
     }
 }
 
-private val tips = listOf(
-    "Say \"remember that…\" — OpenCode keeps it on a memory shelf.",
-    "Hold a message to copy it, edit it or select text.",
-    "Tap the ghost for a chat that leaves no trace.",
-    "Scheduled runs a prompt every day at a time you pick.",
-    "Switch the model right from the composer.",
-    "Attach screenshots and photos — OpenCode can read them.",
+private fun tips() = listOf(
+    SChat.tipRemember,
+    SChat.tipHold,
+    SChat.tipGhost,
+    SChat.tipScheduled,
+    SChat.tipSwitchModel,
+    SChat.tipAttach,
 )
 
-private val codeTips = listOf(
-    "Pick the project in the corner before you start.",
-    "Code → Add device lets you steer OpenCode on your computer.",
-    "Permissions decide what OpenCode may change without asking.",
-    "Artifacts collects the files OpenCode wrote for you.",
+private fun codeTips() = listOf(
+    SChat.tipPickProject,
+    SChat.tipAddDevice,
+    SChat.tipPermissions,
+    SChat.tipArtifacts,
 )
 
 @Composable
 private fun TipLine(code: Boolean) {
     val c = Oc.c
     var i by remember { mutableStateOf(0) }
-    androidx.compose.runtime.LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(6000); i = (i + 1) % tips.size } }
-    val tips = if (code) codeTips else tips
+    androidx.compose.runtime.LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(6000); i = (i + 1) % tips().size } }
+    val tips = if (code) codeTips() else tips()
     Row(Modifier.padding(horizontal = 36.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
         Box(Modifier.width(8.dp).height(8.dp).clip(CircleShape).background(c.warn))
         Spacer(Modifier.width(10.dp))
-        Txt("Tip", size = 15.sp, color = c.warn, family = Oc.mono)
+        Txt(SChat.tip, size = 15.sp, color = c.warn, family = Oc.mono)
         Spacer(Modifier.width(10.dp))
         androidx.compose.animation.AnimatedContent(
             i, label = "tip",
@@ -303,11 +305,11 @@ private fun DesktopChips(code: Boolean, dirName: String, onProject: () -> Unit, 
         if (code) {
             chip(dirName, Ic.Folder, false, onProject)
             Spacer(Modifier.width(8.dp))
-            chip(if (git) "Git" else "No Git", Ic.Code, true, null)
+            chip(if (git) "Git" else SChat.noGit, Ic.Code, true, null)
         } else {
-            chip("Chat", Ic.Chat, false, null)
+            chip(S.chat, Ic.Chat, false, null)
             Spacer(Modifier.width(8.dp))
-            chip(if (Graph.prefs.memoryEnabled) "Memory on" else "Memory off", Ic.Server, true, onMemory)
+            chip(if (Graph.prefs.memoryEnabled) SChat.memoryOn else SChat.memoryOff, Ic.Server, true, onMemory)
         }
     }
 }

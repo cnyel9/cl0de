@@ -43,6 +43,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cl0de.app.Graph
+import com.cl0de.app.data.S
+import com.cl0de.app.data.SAcct
 import com.cl0de.app.data.GitHub
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.components.IconBtn
@@ -76,7 +78,7 @@ fun GitHubScreen(nav: Nav) {
         TopBar("GitHub", left = { IconBtn(Ic.Back, { if (st is GitHub.State.Code) GitHub.cancel(); nav.pop() }) })
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding().padding(bottom = 32.dp)) {
             if (Graph.devices.isRemote) {
-                Txt("GitHub sign-in is for the server on this phone. On a computer, sign in there with gh auth login.", Modifier.padding(20.dp), size = 15.sp, color = c.textDim, lineHeight = 21.sp)
+                Txt(SAcct.githubSignInRemoteNote, Modifier.padding(20.dp), size = 15.sp, color = c.textDim, lineHeight = 21.sp)
                 return@Column
             }
             AnimatedContent(
@@ -95,17 +97,17 @@ fun GitHubScreen(nav: Nav) {
                             }
                         }
                         SettingsGroup {
-                            SettingsRow("Commits as", subtitle = identity?.let { "${it.first} <${it.second}>" } ?: "…", icon = Ic.Git)
-                            SettingsRow("No AI co-authors", subtitle = "Commits and pull requests are yours alone", icon = Ic.User)
-                            SettingsRow("What OpenCode can do", subtitle = "Clone, commit, push, open pull requests, issues and releases with gh", icon = Ic.GitHub)
+                            SettingsRow(SAcct.commitsAs, subtitle = identity?.let { "${it.first} <${it.second}>" } ?: "…", icon = Ic.Git)
+                            SettingsRow(SAcct.noAiCoAuthors, subtitle = SAcct.commitsYoursAlone, icon = Ic.User)
+                            SettingsRow(SAcct.whatOpenCodeCanDo, subtitle = SAcct.githubCapabilities, icon = Ic.GitHub)
                         }
                         Spacer(Modifier.height(18.dp))
                         Txt(
-                            "Just ask in a chat: \"clone my repo …\", \"fix the bug and push\", \"open a PR\".",
+                            SAcct.justAskInChat,
                             Modifier.padding(horizontal = 20.dp), size = 15.sp, color = c.textDim, lineHeight = 21.sp,
                         )
                         Spacer(Modifier.height(18.dp))
-                        Row(Modifier.padding(horizontal = 16.dp)) { SmallButton("Sign out", { scope.launch { GitHub.signOut() } }, danger = true) }
+                        Row(Modifier.padding(horizontal = 16.dp)) { SmallButton(SAcct.signOut, { scope.launch { GitHub.signOut() } }, danger = true) }
                     }
                     else -> Column(Modifier.padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Spacer(Modifier.height(28.dp))
@@ -113,10 +115,10 @@ fun GitHubScreen(nav: Nav) {
                             Ico(Ic.GitHub, size = 42.dp)
                         }
                         Spacer(Modifier.height(20.dp))
-                        Txt("Connect GitHub", size = 24.sp, weight = FontWeight.Medium, family = mono)
+                        Txt(SAcct.connectGitHub, size = 24.sp, weight = FontWeight.Medium, family = mono)
                         Spacer(Modifier.height(8.dp))
                         Txt(
-                            "Sign in once. Then OpenCode can clone your repositories, edit them, commit, push and open pull requests — as you, with no co-authors.",
+                            SAcct.githubConnectDesc,
                             size = 15.sp, color = c.textDim, lineHeight = 21.sp, align = TextAlign.Center,
                         )
                         (st as? GitHub.State.Failed)?.let {
@@ -124,9 +126,9 @@ fun GitHubScreen(nav: Nav) {
                             Txt(it.message, size = 14.sp, color = c.danger, lineHeight = 19.sp, align = TextAlign.Center)
                         }
                         Spacer(Modifier.height(26.dp))
-                        Pill("Sign in with GitHub", { scope.launch { GitHub.signIn() } }, Modifier.fillMaxWidth(), icon = Ic.GitHub)
+                        Pill(SAcct.signInWithGitHub, { scope.launch { GitHub.signIn() } }, Modifier.fillMaxWidth(), icon = Ic.GitHub)
                         Spacer(Modifier.height(10.dp))
-                        Txt("Installs git and the GitHub CLI in Ubuntu, about 30 MB.", size = 13.sp, color = c.textDim)
+                        Txt(SAcct.installsGitGh, size = 13.sp, color = c.textDim)
                     }
                 }
             }
@@ -143,24 +145,24 @@ private fun CodeStep(ctx: Context, st: GitHub.State.Code, mono: androidx.compose
     val shape = when (Oc.look.id) { "terminal" -> RectangleShape; "hairline" -> RoundedCornerShape(2.dp); else -> Oc.round(24.dp) }
     Column(Modifier.padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(24.dp))
-        Txt("Enter this code on GitHub", size = 20.sp, weight = FontWeight.Medium)
+        Txt(SAcct.enterCodeOnGitHub, size = 20.sp, weight = FontWeight.Medium)
         Spacer(Modifier.height(18.dp))
         Box(
             Modifier.fillMaxWidth().clip(shape).background(c.surface).border(1.dp, c.border, shape).padding(vertical = 26.dp),
             contentAlignment = Alignment.Center,
         ) { Txt(st.userCode, size = 40.sp, weight = FontWeight.Medium, family = Oc.mono) }
         Spacer(Modifier.height(18.dp))
-        Pill("Copy and open GitHub", {
+        Pill(SAcct.copyAndOpenGitHub, {
             copy(ctx, st.userCode)
             runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(st.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
         }, Modifier.fillMaxWidth(), icon = Ic.External)
         Spacer(Modifier.height(22.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
             Spinner(16.dp, stroke = 2.dp); Spacer(Modifier.width(10.dp))
-            Txt("Waiting for you to approve…", size = 14.sp, color = c.textDim, family = mono)
+            Txt(SAcct.waitingForApprove, size = 14.sp, color = c.textDim, family = mono)
         }
         Spacer(Modifier.height(16.dp))
-        SmallButton("Cancel", { GitHub.cancel() })
+        SmallButton(S.cancel, { GitHub.cancel() })
     }
 }
 
