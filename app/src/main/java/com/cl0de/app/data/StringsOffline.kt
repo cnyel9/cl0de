@@ -61,6 +61,13 @@ object SOffline {
     )
     val benchFailed get() = AppLang.s("Tes kecepatan gagal, coba lagi", "Speed test failed, try again")
 
+    // Light agent (registered in the OpenCode config next to the provider, for offline sessions)
+    val agentDescription get() = AppLang.s("Chat ringan tanpa alat untuk model offline", "Light tool-free chat for offline models")
+    val agentPrompt get() = AppLang.s(
+        "Kamu asisten yang membantu dan berjalan sepenuhnya di HP pengguna, tanpa internet dan tanpa alat apa pun. Jawab singkat, jelas, dan langsung dalam bahasa pengguna. Jangan mengaku bisa membuka berkas, menjalankan perintah, atau mengakses internet.",
+        "You are a helpful assistant running entirely on the user's phone, with no internet and no tools. Answer briefly, clearly and directly, in the user's language. Never claim you can open files, run commands or access the internet.",
+    )
+
     // Chat gate messages (shown as a toast when a chat can't be sent yet)
     val gateNotDownloaded get() = AppLang.s(
         "Model offline ini belum terunduh. Buka Pengaturan, Model Offline, untuk mengunduhnya.",

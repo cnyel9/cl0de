@@ -489,6 +489,9 @@ class RuntimeController(
                     add("--host"); add("127.0.0.1"); add("--port"); add(LLAMA_PORT.toString())
                     add("-m"); add(guestModel)
                     add("-c"); add("4096")
+                    // one slot only: the default 4 slots split this phone's little CPU,
+                    // chat wrote at only ~2.2 tok/s on device against the bench's 4.5
+                    add("--parallel"); add("1")
                     add("-t"); add(llamaThreads().toString())
                     if (guestMmproj != null) { add("--mmproj"); add(guestMmproj) }
                 }

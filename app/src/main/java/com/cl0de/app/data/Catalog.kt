@@ -50,7 +50,7 @@ class Catalog(private val api: OpenCodeApi, private val prefs: Prefs, private va
             val m = defaults[p.id]?.let { p.models[it] } ?: p.models.values.firstOrNull() ?: continue
             prefs.providerId = p.id; prefs.modelId = m.id; prefs.variant = ""
             // a forced switch to a cloud model releases the offline model's RAM right away
-            if (p.id != OfflineModels.ID) Graph.runtime.stopLlama()
+            if (p.id != OfflineModels.ID) { Graph.runtime.stopLlama(); OfflineModels.restoreAgent() }
             return
         }
     }
@@ -63,7 +63,7 @@ class Catalog(private val api: OpenCodeApi, private val prefs: Prefs, private va
             ?: p.models.values.firstOrNull() ?: return
         prefs.providerId = p.id; prefs.modelId = m.id; prefs.variant = ""
         // selecting a cloud provider's model releases the offline model's RAM right away
-        if (p.id != OfflineModels.ID) Graph.runtime.stopLlama()
+        if (p.id != OfflineModels.ID) { Graph.runtime.stopLlama(); OfflineModels.restoreAgent() }
     }
 
     fun selectedLabel(): String {

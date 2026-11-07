@@ -33,6 +33,8 @@ import java.io.File
  */
 object OfflineModels {
     const val ID = "offline"
+    /** Name of the light agent registered next to the provider; offline sessions run as it. */
+    const val AGENT = "offline"
     const val BASE_URL = "http://127.0.0.1:8081/v1"
 
     const val ENGINE_URL = "https://github.com/ggml-org/llama.cpp/releases/download/b12179/llama-b12179-bin-ubuntu-arm64.tar.gz"
@@ -208,6 +210,20 @@ object OfflineModels {
         .put("name", name).put("tool_call", false).put("reasoning", false).put("attachment", false)
         .put("limit", JSONObject().put("context", 4096).put("output", 1024))
 
+    /**
+     * The light agent (Team pattern: an "agent" block in the same global config). Its short
+     * prompt replaces the built-in agent prompt and every tool is off, so a chat request
+     * stays small: the stock agent's request measured 17,560 tokens on device and the local
+     * server (context 4096) rejected it outright. No model is pinned on the agent: the app
+     * already sends the selected model with every prompt, the binding to this provider is
+     * the app flow in [activateAgent] / [restoreAgent].
+     */
+    private fun agentJson() = JSONObject()
+        .put("mode", "primary")
+        .put("description", SOffline.agentDescription)
+        .put("prompt", SOffline.agentPrompt)
+        .put("tools", JSONObject().put("*", false))
+
     private suspend fun apply(models: List<OfflineModel>?) {
         val disabled = disabledList().filter { it != ID }.toMutableList()
         if (models == null) disabled.add(ID)
@@ -226,8 +242,30 @@ object OfflineModels {
                         .put("models", modelsJson),
                 ),
             )
+            patch.put("agent", JSONObject().put(AGENT, agentJson()))
+        } else {
+            patch.put("agent", JSONObject().put(AGENT, JSONObject().put("disable", true)))
         }
         Graph.api.patchGlobalConfig(OcJson.parseToJsonElement(patch.toString()) as JsonObject)
+    }
+
+    /** An offline model takes the session over: remember the current agent, run as the light one. */
+    fun activateAgent() {
+        val prefs = Graph.prefs
+        if (prefs.agent != AGENT) {
+            prefs.agentBeforeOffline = prefs.agent
+            prefs.agent = AGENT
+        }
+    }
+
+    /**
+     * A cloud model takes over again: hand the session back to the agent the user had
+     * before offline. Only fires while the light agent is still the selected one, so a
+     * manual agent pick made in between is never overridden.
+     */
+    fun restoreAgent() {
+        val prefs = Graph.prefs
+        if (prefs.agent == AGENT) prefs.agent = prefs.agentBeforeOffline.ifBlank { "build" }
     }
 
     /** Re-register the provider with exactly the set of models on disk (release-1 reload pattern). */
@@ -259,6 +297,7 @@ object OfflineModels {
         prefs.providerId = ID
         prefs.modelId = m.id
         prefs.variant = ""
+        activateAgent()
         val key = "$ID/${m.id}"
         prefs.recentModels = (listOf(key) + prefs.recentModels.split(',').filter { it.isNotBlank() && it != key }).take(6).joinToString(",")
         Graph.runtime.startLlama(m.id, guestPath(m.file), m.mmproj?.let { guestPath(it) })

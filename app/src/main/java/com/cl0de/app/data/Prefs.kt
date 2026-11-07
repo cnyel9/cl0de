@@ -127,6 +127,8 @@ class Prefs(ctx: Context) {
     var modelId by str("model_id", "")
     var variant by str("model_variant", "")
     var agent by str("agent", "build")
+    /** The agent to hand the session back to when an offline model is replaced by a cloud one. */
+    var agentBeforeOffline by str("agent_before_offline", "")
     var permissionMode by str("permission_mode", "auto")  // ask | edits | auto
     var currentDir by str("current_dir", "/root/work")
     var pinned by str("pinned", "")
