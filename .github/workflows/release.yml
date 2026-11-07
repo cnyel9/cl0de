@@ -36,10 +36,14 @@ jobs:
           KEYSTORE_B64: ${{ secrets.SIGNING_KEYSTORE_B64 }}
         run: |
           test -n "$KEYSTORE_B64" || { echo "SIGNING_KEYSTORE_B64 secret is missing"; exit 1; }
-          mkdir -p ~/.android
-          echo "$KEYSTORE_B64" | base64 -d > ~/.android/debug.keystore
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/cl0de.keystore"
 
       - name: Build
+        env:
+          SIGNING_KEYSTORE_PATH: ${{ runner.temp }}/cl0de.keystore
+          SIGNING_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: cl0de
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: ./gradlew --no-daemon :app:assembleRelease
 
       - name: Publish
