@@ -25,7 +25,7 @@ object OfflineCatalog {
         OfflineModel(
             id = "gemma-3-1b", displayName = "Gemma 3 1B", quant = "q4_k_m",
             file = OfflineFile("ggml-org/gemma-3-1b-it-GGUF", "gemma-3-1b-it-Q4_K_M.gguf", 806058240L, "8ccc5cd1f1b3602548715ae25a66ed73fd5dc68a210412eea643eb20eb75a135"),
-            mmproj = null, minRamGb = 2,
+            mmproj = null, minRamGb = 2.0,
             inLowMid = true, inHighFlagship = true,
         ),
         OfflineModel(
@@ -139,7 +139,7 @@ object OfflineCatalog {
         OfflineModel(
             id = "spark-x2.5-4b", displayName = "Spark-X2.5 4B", quant = "q4_k_m",
             file = OfflineFile("XHToken/Spark-X2.5-4B-GGUF", "Spark-X2.5-4B-Q4_K_M.gguf", 2600224352L, "adfcfa19a4ed6a5985da8bf565fe15f8e1a7e131d79bae2d19d48d1c40109428"),
-            mmproj = null, minRamGb = 4,
+            mmproj = null, minRamGb = 4.0,
             inLowMid = false, inHighFlagship = true,
         ),
     )
