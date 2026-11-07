@@ -68,6 +68,7 @@ object Graph {
         // the server is up: connect the "phone" MCP to it (the config entry changes only when needed)
         scope.launch { runtime.state.collect { if (it is com.cl0de.app.runtime.RuntimeState.Running) PhoneBridge.register() } }
         Memory.sync()
+        com.cl0de.app.data.AppLang.applyRule()
         Vault.restore()
         Vault.reconcileAccount()
         scope.launch(Dispatchers.IO) { while (true) { Vault.save(); Vault.reconcileAccount(); delay(30_000) } }

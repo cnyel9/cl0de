@@ -149,6 +149,7 @@ fun SettingsScreen(nav: Nav, onMenu: () -> Unit) {
                 SettingsRow("Color mode", subtitle = prefs.colorMode.replaceFirstChar { it.uppercase() }, icon = Ic.Moon, onClick = { dialog = "color" })
                 SettingsRow("Font style", subtitle = if (prefs.fontStyle == "default") "Default" else "System", icon = Ic.FontSize, onClick = { nav.push(Route.Appearance) })
                 SettingsRow("Voice", subtitle = com.cl0de.app.data.Speech.label(), icon = Ic.Waveform, onClick = { dialog = "voice" })
+                SettingsRow("Bahasa / Language", subtitle = com.cl0de.app.data.AppLang.label(), icon = Ic.Globe, onClick = { dialog = "applang" })
             }
             Spacer(Modifier.height(16.dp))
             SettingsGroup {
@@ -183,6 +184,7 @@ fun SettingsScreen(nav: Nav, onMenu: () -> Unit) {
     if (dialog == "bug") BugDialog { dialog = null }
     when (dialog) {
         "voice" -> ChoiceDialog("Speech language", com.cl0de.app.data.Speech.languages.map { Triple(it.first, it.second, null) }, prefs.speechLang, { prefs.speechLang = it }) { dialog = null }
+        "applang" -> ChoiceDialog("Bahasa / Language", com.cl0de.app.data.AppLang.options.map { Triple(it.first, it.second, null) }, prefs.appLang, { prefs.appLang = it; com.cl0de.app.data.AppLang.applyRule() }) { dialog = null }
         "color" -> ChoiceDialog("Color mode", listOf(Triple("system", "System", Ic.Phone), Triple("light", "Light", Ic.Sun), Triple("dark", "Dark", Ic.Moon)), prefs.colorMode, { prefs.colorMode = it }) { dialog = null }
         "font" -> ChoiceDialog("Font style", listOf(Triple("default", "Default (serif headings)", null), Triple("system", "System", Ic.Phone)), prefs.fontStyle, { prefs.fontStyle = it }) { dialog = null }
         "size" -> ChoiceDialog("Text size", listOf(Triple("small", "Small", null), Triple("medium", "Medium", null), Triple("large", "Large", null)), prefs.textSize, { prefs.textSize = it }) { dialog = null }
