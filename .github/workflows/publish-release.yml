@@ -2,6 +2,22 @@ name: Publish Release Asset
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag release tujuan"
+        required: true
+        default: "v0.0.1-tester3"
+        type: string
+      source_run_id:
+        description: "Run ID build sumber artifact terverifikasi"
+        required: true
+        default: "42382791772"
+        type: string
+      prerelease:
+        description: "Tandai sebagai pre-release"
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: write
@@ -11,20 +27,44 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout (catatan rilis)
+        uses: actions/checkout@v4
+
       - name: Download verified build artifact
         uses: actions/download-artifact@v4
         with:
           name: cl0de-release
-          run-id: 42266102995
+          run-id: ${{ inputs.source_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: dl
-      - name: Upload APK to release v0.0.1-release-1
+
+      - name: Verify single APK
+        run: |
+          set -euo pipefail
+          COUNT=$(find dl -type f -name "*.apk" | wc -l)
+          echo "apk count: $COUNT"
+          test "$COUNT" -eq 1
+          APK=$(find dl -type f -name "*.apk" | head -1)
+          cp "$APK" Cl0de-0.0.1-tester3.apk
+          ls -l Cl0de-0.0.1-tester3.apk
+          sha256sum Cl0de-0.0.1-tester3.apk
+
+      - name: Create release and upload APK
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ls -la dl
-          APK=$(find dl -name "*.apk" | head -1)
-          echo "found: $APK"
-          cp "$APK" Cl0de-0.0.1-release-1.apk
-          ls -la Cl0de-0.0.1-release-1.apk
-          gh release upload v0.0.1-release-1 Cl0de-0.0.1-release-1.apk --repo cnyel9/cl0de --clobber
+          set -euo pipefail
+          TAG="${{ inputs.tag }}"
+          PRE=""
+          if [ "${{ inputs.prerelease }}" = "true" ]; then PRE="--prerelease"; fi
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload "$TAG" Cl0de-0.0.1-tester3.apk --repo "${{ github.repository }}" --clobber
+          else
+            gh release create "$TAG" Cl0de-0.0.1-tester3.apk \
+              --repo "${{ github.repository }}" \
+              --target "${{ github.sha }}" \
+              --title "Cl0de 0.0.1 tester3" \
+              --notes-file "docs/releases/$TAG.md" \
+              $PRE
+          fi
+          gh release view "$TAG" --repo "${{ github.repository }}" --json tagName,name,isPrerelease,assets --jq '{tag: .tagName, title: .name, prerelease: .isPrerelease, assets: [.assets[] | {name, size, state}]}'
