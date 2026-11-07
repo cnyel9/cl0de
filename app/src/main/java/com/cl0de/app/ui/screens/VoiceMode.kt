@@ -62,14 +62,18 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import com.cl0de.app.Graph
 import com.cl0de.app.data.CHAT_DIR
+import com.cl0de.app.data.SVoice
+import com.cl0de.app.data.SMisc
 import com.cl0de.app.ui.components.Ico
 import com.cl0de.app.ui.components.Txt
 import com.cl0de.app.ui.components.tap
 import com.cl0de.app.ui.theme.Ic
 import com.cl0de.app.ui.theme.Oc
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 import kotlin.math.PI
@@ -95,15 +99,21 @@ fun VoiceMode(sessionId: String?, onClose: (String?) -> Unit) {
     var caption by remember { mutableStateOf("") }
     var level by remember { mutableFloatStateOf(0f) }
     var granted by remember { mutableStateOf(ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) }
-    val perm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted = it; if (!it) caption = "Microphone access is needed to talk" }
+    val perm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted = it; if (!it) caption = SMisc.micNeededToTalk }
 
     val recognizer = remember { if (SpeechRecognizer.isRecognitionAvailable(ctx)) SpeechRecognizer.createSpeechRecognizer(ctx) else null }
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
+    /** True when the device has no working text-to-speech engine or voice data: replies stay silent. */
+    var ttsMissing by remember { mutableStateOf(false) }
     var listenNext by remember { mutableStateOf<() -> Unit>({}) }
+
+    // Offline listening (sherpa-onnx Whisper) for devices with no system recognition service.
+    val offlineRec = remember { com.cl0de.app.data.OfflineRecorder() }
+    val offlineChunks = remember { mutableListOf<FloatArray>() }
 
     fun speak(text: String) {
         val t = tts
-        if (!speaker || t == null || text.isBlank()) { talk = Talk.Idle; listenNext(); return }
+        if (!speaker || t == null || ttsMissing || text.isBlank()) { talk = Talk.Idle; listenNext(); return }
         val clean = text.replace(Regex("```[\\s\\S]*?```"), " code omitted. ").replace(Regex("[`*#>_|\\[\\]]"), "").replace(Regex("\\((/|https?://)[^)]*\\)"), "").take(2500)
         t.language = com.cl0de.app.data.Speech.ttsLocale(clean)
         talk = Talk.Speaking
@@ -130,16 +140,56 @@ fun VoiceMode(sessionId: String?, onClose: (String?) -> Unit) {
                 caption = answer
                 speak(answer)
             } catch (e: Exception) {
-                caption = e.message ?: "Something went wrong"
+                caption = e.message ?: SMisc.somethingWentWrong
                 talk = Talk.Idle
             }
         }
     }
 
+    fun startOfflineListen() {
+        talk = Talk.Listening; caption = ""
+        synchronized(offlineChunks) { offlineChunks.clear() }
+        offlineRec.start(
+            onChunk = { s -> synchronized(offlineChunks) { offlineChunks.add(s) } },
+            onLevel = { level = it },
+        )
+    }
+
+    /** Ring tap while listening offline: stop recording, transcribe, then treat it like a heard phrase. */
+    fun stopOfflineListen() {
+        offlineRec.stop()
+        level = 0f
+        val all = synchronized(offlineChunks) {
+            val out = FloatArray(offlineChunks.sumOf { it.size }.coerceAtMost(16000 * 120))
+            var pos = 0
+            for (ch in offlineChunks) {
+                val n = minOf(ch.size, out.size - pos)
+                if (n <= 0) break
+                ch.copyInto(out, pos, 0, n)
+                pos += n
+            }
+            offlineChunks.clear()
+            out
+        }
+        if (all.isEmpty()) { talk = Talk.Idle; return }
+        caption = SVoice.transcribing
+        scope.launch {
+            val text = runCatching {
+                withContext(Dispatchers.Default) { com.cl0de.app.data.OfflineSpeech.transcribe(ctx, all, com.cl0de.app.data.OfflineSpeech.whisperLang()) }
+            }.getOrDefault("")
+            if (text.isBlank()) { caption = ""; listen() } else ask(text)
+        }
+    }
+
     fun listen() {
-        val r = recognizer ?: run { caption = "Speech recognition is not available on this device"; return }
         if (!granted) { perm.launch(Manifest.permission.RECORD_AUDIO); return }
         if (muted) { talk = Talk.Idle; return }
+        val r = recognizer ?: run {
+            // No system recognition service on this device: the offline Whisper engine is the way in.
+            if (com.cl0de.app.data.OfflineSpeech.isReady(ctx)) startOfflineListen()
+            else caption = SMisc.speechNotAvailable
+            return
+        }
         talk = Talk.Listening; caption = ""
         r.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {}
@@ -169,20 +219,33 @@ fun VoiceMode(sessionId: String?, onClose: (String?) -> Unit) {
 
     DisposableEffect(Unit) {
         tts = TextToSpeech(ctx.applicationContext) { st ->
-            if (st == TextToSpeech.SUCCESS) tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                override fun onStart(id: String?) {}
-                override fun onDone(id: String?) { scope.launch { if (talk == Talk.Speaking) { talk = Talk.Idle; listen() } } }
-                @Deprecated("api") override fun onError(id: String?) { scope.launch { talk = Talk.Idle; listen() } }
-            })
+            if (st == TextToSpeech.SUCCESS) {
+                // An engine object can exist while no engine or voice data is actually installed:
+                // detect that once and say so plainly instead of failing silently on every reply.
+                val avail = runCatching { tts?.setLanguage(com.cl0de.app.data.Speech.ttsLocale("test")) }.getOrNull()
+                if (avail == TextToSpeech.LANG_MISSING_DATA || avail == TextToSpeech.LANG_NOT_AVAILABLE) {
+                    ttsMissing = true
+                    Graph.chats.toasts.tryEmit(SVoice.ttsMissing)
+                }
+                tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(id: String?) {}
+                    override fun onDone(id: String?) { scope.launch { if (talk == Talk.Speaking) { talk = Talk.Idle; listen() } } }
+                    @Deprecated("api") override fun onError(id: String?) { scope.launch { talk = Talk.Idle; listen() } }
+                })
+            } else {
+                ttsMissing = true
+                Graph.chats.toasts.tryEmit(SVoice.ttsMissing)
+            }
         }
         onDispose {
             recognizer?.destroy()
+            offlineRec.stop()
             tts?.stop(); tts?.shutdown()
         }
     }
     LaunchedEffect(granted) { if (granted) listen() else perm.launch(Manifest.permission.RECORD_AUDIO) }
 
-    fun close() { recognizer?.cancel(); tts?.stop(); onClose(session) }
+    fun close() { recognizer?.cancel(); offlineRec.stop(); tts?.stop(); onClose(session) }
 
     Dialog(onDismissRequest = { close() }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Box(Modifier.fillMaxSize().screenBackdrop("VoiceMode1")) {
@@ -192,7 +255,7 @@ fun VoiceMode(sessionId: String?, onClose: (String?) -> Unit) {
                     when (talk) {
                         Talk.Speaking -> { tts?.stop(); talk = Talk.Idle; listen() } // interrupt, like in Claude
                         Talk.Idle -> listen()
-                        Talk.Listening -> recognizer?.stopListening()
+                        Talk.Listening -> if (recognizer == null) stopOfflineListen() else recognizer?.stopListening()
                         Talk.Thinking -> {}
                     }
                 })
@@ -200,10 +263,10 @@ fun VoiceMode(sessionId: String?, onClose: (String?) -> Unit) {
                 AnimatedContent(talk, label = "talk", transitionSpec = { fadeIn(tween(120)) togetherWith fadeOut(tween(80)) }) { t ->
                     Txt(
                         when (t) {
-                            Talk.Idle -> if (session == null) "Let's talk" + Graph.prefs.userName.takeIf { it.isNotBlank() }?.let { ", $it" }.orEmpty() else "Tap to talk"
-                            Talk.Listening -> "Listening…"
-                            Talk.Thinking -> "Thinking…"
-                            Talk.Speaking -> "Tap to interrupt"
+                            Talk.Idle -> if (session == null) SMisc.letsTalk + Graph.prefs.userName.takeIf { it.isNotBlank() }?.let { ", $it" }.orEmpty() else SMisc.tapToTalk
+                            Talk.Listening -> SMisc.listening
+                            Talk.Thinking -> SMisc.thinking
+                            Talk.Speaking -> SMisc.tapToInterrupt
                         },
                         size = 24.sp, family = Oc.heading,
                     )
@@ -220,7 +283,7 @@ fun VoiceMode(sessionId: String?, onClose: (String?) -> Unit) {
                     Box(
                         Modifier.size(64.dp).clip(CircleShape).background(if (muted) c.danger.copy(alpha = .18f) else c.surfaceHigh).tap {
                             muted = !muted
-                            if (muted) { recognizer?.cancel(); if (talk == Talk.Listening) talk = Talk.Idle } else if (talk == Talk.Idle) listen()
+                            if (muted) { recognizer?.cancel(); offlineRec.stop(); if (talk == Talk.Listening) talk = Talk.Idle } else if (talk == Talk.Idle) listen()
                         },
                         contentAlignment = Alignment.Center,
                     ) { Ico(if (muted) Ic.MicOff else Ic.Mic, tint = if (muted) c.danger else c.text, size = 26.dp) }
