@@ -306,14 +306,20 @@ object OfflineModels {
     /**
      * The gate at the top of ChatHub.send: with a cloud model selected the local server
      * has no business running; with an offline model selected the chat must not go out
-     * before the server answers healthily with exactly that model loaded.
+     * before the server answers healthily with exactly that model loaded. The session's
+     * agent is also enforced from the active model here, not left to the model pick:
+     * a resumed session whose model was already selected never replays useModel() or
+     * pickModel(), so without this the stock agent (with every tool attached) keeps
+     * serving it and the local server rejects its oversized requests outright.
      */
     suspend fun ensureForSend() {
         val prefs = Graph.prefs
         if (prefs.providerId != ID) {
             Graph.runtime.stopLlama()
+            restoreAgent()
             return
         }
+        activateAgent()
         val m = OfflineCatalog.byId(prefs.modelId) ?: throw Exception(SOffline.gateNotDownloaded)
         if (!isDownloaded(m)) throw Exception(SOffline.gateNotDownloaded)
         if (!engineReady()) throw Exception(SOffline.gateEngineMissing)
