@@ -612,7 +612,7 @@ fun TopModelPill(state: ComposerState) {
     val prefs = Graph.prefs
     val name = providers.firstOrNull { it.id == prefs.providerId }?.models?.get(prefs.modelId)?.name?.takeIf { it.isNotBlank() } ?: prefs.modelId.ifBlank { "Model" }
     Row(
-        Modifier.padding(start = 6.dp).height(40.dp).widthIn(max = 220.dp).clip(CircleShape).background(c.surfaceHigh).tap(scale = 0.97f) { state.showModel = true }.padding(horizontal = 14.dp),
+        Modifier.padding(start = 6.dp).height(36.dp).widthIn(max = 200.dp).clip(CircleShape).background(c.surfaceHigh).tap(scale = 0.97f) { state.showModel = true }.padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Txt(name, size = 15.sp, maxLines = 1, modifier = Modifier.weight(1f, fill = false))

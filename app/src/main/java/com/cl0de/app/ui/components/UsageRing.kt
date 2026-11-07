@@ -89,11 +89,11 @@ fun UsageRing(chat: Chat?, nav: Nav) {
             Txt("[${(f * 100).toInt()}%]", size = 14.sp, family = Oc.mono, color = col)
         }
         "kimi", "cloud" -> Box(
-            Modifier.size(48.dp).clip(CircleShape).background(c.surfaceHigh.copy(alpha = 0.7f)).border(1.dp, c.border, CircleShape).tap(onClick = onClick),
+            Modifier.size(40.dp).clip(CircleShape).background(c.surfaceHigh.copy(alpha = 0.7f)).border(1.dp, c.border, CircleShape).tap(onClick = onClick),
             contentAlignment = Alignment.Center,
-        ) { Ring(f, col, Modifier.size(22.dp), 3.dp) }
-        else -> Box(Modifier.size(44.dp).clip(CircleShape).tap(onClick = onClick), contentAlignment = Alignment.Center) {
-            Ring(f, col, Modifier.size(if (look == "hairline") 20.dp else 22.dp), if (look == "hairline") 1.5.dp else 2.5.dp, square = look == "hairline")
+        ) { Ring(f, col, Modifier.size(19.dp), 2.5.dp) }
+        else -> Box(Modifier.size(40.dp).clip(CircleShape).tap(onClick = onClick), contentAlignment = Alignment.Center) {
+            Ring(f, col, Modifier.size(if (look == "hairline") 18.dp else 19.dp), if (look == "hairline") 1.5.dp else 2.5.dp, square = look == "hairline")
         }
     }
     if (open) UsagePanel(chat, nav) { open = false }
