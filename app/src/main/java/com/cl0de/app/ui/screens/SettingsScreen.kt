@@ -169,7 +169,7 @@ fun SettingsScreen(nav: Nav, onMenu: () -> Unit) {
                 SettingsGroup {
                     SettingsRow("Log out", icon = Ic.External, titleColor = c.danger, onClick = {
                         scope.launch {
-                            for (pid in listOf("opencode", "opencode-go", "github-copilot", "groq", "openrouter")) runCatching { Graph.api.removeAuth(pid) }
+                            for (pid in listOf("opencode", "opencode-go", "github-copilot", "google", "groq", "openrouter")) runCatching { Graph.api.removeAuth(pid) }
                             runCatching { Graph.api.disposeAll() }
                             com.cl0de.app.data.Vault.forgetAccount()
                             prefs.signedIn = ""; runCatching { Graph.catalog.refresh() }
