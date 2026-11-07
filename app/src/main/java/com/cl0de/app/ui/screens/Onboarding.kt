@@ -61,8 +61,12 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.material3.Text
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -407,7 +411,8 @@ private fun TourStep(i: Int) {
         Spacer(Modifier.height(26.dp))
         com.cl0de.app.ui.components.PixelCloud(Modifier.size(width = 190.dp, height = 130.dp), cue = i)
         Spacer(Modifier.height(30.dp))
-        Appear(shown, 2) { Txt(page.note, size = 16.sp, color = c.textDim, lineHeight = 23.sp, align = TextAlign.Center) }
+        // A clean pad behind the note: the backdrop clouds must never sit under the glyphs.
+        Appear(shown, 2) { Txt(page.note, Modifier.clip(Oc.round(12.dp)).background(c.bg.copy(alpha = 0.78f)).padding(horizontal = 14.dp, vertical = 8.dp), size = 16.sp, color = c.textDim, lineHeight = 23.sp, align = TextAlign.Center) }
         Spacer(Modifier.height(22.dp))
         Appear(shown, 3) { TourPicture(i) }
     }
@@ -419,11 +424,30 @@ private fun TourPicture(i: Int) {
     val c = Oc.c
     val mono = Oc.mono
     when (i) {
-        1 -> Column(Modifier.fillMaxWidth().clip(Oc.round(14.dp)).border(1.dp, c.border, Oc.round(14.dp)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Txt(SMisc.ranCommandsEdited, size = 14.sp, color = c.textDim); Txt("app.py", size = 14.sp)
-                Txt(" +12", size = 14.sp, color = c.ok); Txt(" −3", size = 14.sp, color = c.danger)
-                Spacer(Modifier.width(4.dp)); Ico(Ic.ChevronRight, tint = c.textDim, size = 14.dp)
+        1 -> Column(Modifier.fillMaxWidth().clip(Oc.round(14.dp)).background(c.surface).border(1.dp, c.border, Oc.round(14.dp)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // The summary sentence may wrap (the Indonesian wording is longer), but the
+            // diff counts stay one unbreakable chip: as loose texts in a row, "+12 −3"
+            // used to split across lines and strand the "3" on its own line.
+            Row(verticalAlignment = Alignment.Top) {
+                Text(
+                    buildAnnotatedString {
+                        withStyle(SpanStyle(color = c.textDim)) { append(SMisc.ranCommandsEdited) }
+                        withStyle(SpanStyle(color = c.text)) { append("app.py") }
+                    },
+                    fontSize = 14.sp, fontFamily = Oc.body, lineHeight = 20.sp,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(8.dp))
+                Row(
+                    Modifier.clip(Oc.round(7.dp)).background(c.surfaceHigh).padding(horizontal = 7.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Txt("+12", size = 13.sp, color = c.ok, maxLines = 1)
+                    Spacer(Modifier.width(5.dp))
+                    Txt("−3", size = 13.sp, color = c.danger, maxLines = 1)
+                }
+                Spacer(Modifier.width(4.dp))
+                Ico(Ic.ChevronRight, tint = c.textDim, size = 14.dp, modifier = Modifier.padding(top = 3.dp))
             }
             Txt("$ python app.py", Modifier.fillMaxWidth().clip(Oc.round(8.dp)).background(c.codeBg).padding(horizontal = 10.dp, vertical = 8.dp), size = 13.sp, color = c.link, family = mono)
         }
