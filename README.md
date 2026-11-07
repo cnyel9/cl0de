@@ -2,15 +2,7 @@
 
 An Android app that runs its own OpenCode server on the phone. It unpacks Ubuntu 24.04 in proot (no root), starts `opencode serve` on 127.0.0.1 and gives it a mobile UI. You don't need a computer, but you can also connect to OpenCode running on one.
 
-Current version: **v0.0.1 beta-4**. Android 8+, arm64. Unofficial client.
-
-<p align="center">
-  <img src="docs/screenshots/cloud-home.png" width="19%" alt="Home">
-  <img src="docs/screenshots/cloud-steps.png" width="19%" alt="The agent's steps with command output">
-  <img src="docs/screenshots/cloud-room.png" width="19%" alt="The mascot's room">
-  <img src="docs/screenshots/cloud-mascot.png" width="19%" alt="Mascot settings">
-  <img src="docs/screenshots/cloud-drawer.png" width="19%" alt="Side menu">
-</p>
+Current version: **v0.0.1 release-1**. Android 8+, arm64. Unofficial client.
 
 ## Features
 
