@@ -15,8 +15,8 @@ android {
         // and with targetSdk >= 29 Android forbids exec from app_data_file (same as Termux).
         // The APK is distributed as a file, not through Play.
         targetSdk = 28
-        versionCode = 9
-        versionName = "0.0.1 tester2"
+        versionCode = 10
+        versionName = "0.0.1 tester3"
         ndk { abiFilters += "arm64-v8a" }
     }
 
