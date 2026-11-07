@@ -61,19 +61,35 @@ class Dictation(private val ctx: Context) {
         private set
     private var rec: SpeechRecognizer? = null
     private var lastPush = 0L
+    /** Set after the first client/network failure: the rest of this session listens offline. */
+    private var offlineRetry = false
 
     val text get() = listOf(done, partial).filter { it.isNotBlank() }.joinToString(" ")
 
     fun start() {
         if (active) return
-        if (!SpeechRecognizer.isRecognitionAvailable(ctx)) { Graph.chats.toasts.tryEmit("No speech recognizer on this device"); return }
-        done = ""; partial = ""; active = true; startedAt = System.currentTimeMillis()
+        if (!SpeechRecognizer.isRecognitionAvailable(ctx)) {
+            Graph.chats.toasts.tryEmit(com.cl0de.app.data.AppLang.s("Tidak ada layanan pengenal bicara di perangkat ini", "No speech recognizer on this device"))
+            return
+        }
+        done = ""; partial = ""; active = true; startedAt = System.currentTimeMillis(); offlineRetry = false
         for (i in levels.indices) levels[i] = 0f
         rec = SpeechRecognizer.createSpeechRecognizer(ctx).also { it.setRecognitionListener(listener) }
         listen()
     }
 
-    private fun listen() { if (active) runCatching { rec?.startListening(Speech.recognizerIntent()) } }
+    private fun listen() { if (active) runCatching { rec?.startListening(Speech.recognizerIntent(offlineRetry)) } }
+
+    /** Human message for a recognizer error code, in the app language. Raw codes are never shown. */
+    private fun errorText(error: Int): String = with(com.cl0de.app.data.AppLang) {
+        when (error) {
+            SpeechRecognizer.ERROR_CLIENT -> s("Layanan pengenal bicara sedang bermasalah, coba lagi nanti", "The speech recognition service ran into a problem, please try again later")
+            SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> s("Koneksi bermasalah, pengenal bicara berhenti", "Connection problem, speech recognition stopped")
+            SpeechRecognizer.ERROR_AUDIO -> s("Mikrofon bermasalah, pengenal bicara berhenti", "Microphone problem, speech recognition stopped")
+            SpeechRecognizer.ERROR_SERVER -> s("Server pengenal bicara sedang bermasalah, coba lagi nanti", "The speech recognition server ran into a problem, please try again later")
+            else -> s("Pengenal bicara berhenti", "Speech recognition stopped")
+        }
+    }
 
     /** Stop and return everything recognized. */
     fun finish(): String { val t = text; stop(); return t }
@@ -101,8 +117,12 @@ class Dictation(private val ctx: Context) {
             if (!active) return
             when (error) {
                 SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT, SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> listen()
-                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> { Graph.chats.toasts.tryEmit("Microphone access is needed"); stop() }
-                else -> { Graph.chats.toasts.tryEmit("Speech recognition stopped (error $error)"); stop() }
+                // Client or network failure: one silent retry with offline recognition before giving up.
+                SpeechRecognizer.ERROR_CLIENT, SpeechRecognizer.ERROR_NETWORK ->
+                    if (!offlineRetry) { offlineRetry = true; listen() }
+                    else { Graph.chats.toasts.tryEmit(errorText(error)); stop() }
+                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> { Graph.chats.toasts.tryEmit(com.cl0de.app.data.AppLang.s("Perlu izin mikrofon", "Microphone access is needed")); stop() }
+                else -> { Graph.chats.toasts.tryEmit(errorText(error)); stop() }
             }
         }
         override fun onResults(results: Bundle?) {
@@ -125,7 +145,7 @@ fun rememberDictation(): Pair<Dictation, () -> Unit> {
     val ctx = LocalContext.current
     val d = remember { Dictation(ctx) }
     val perm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
-        if (ok) d.start() else Graph.chats.toasts.tryEmit("Microphone access is needed to dictate")
+        if (ok) d.start() else Graph.chats.toasts.tryEmit(com.cl0de.app.data.AppLang.s("Perlu izin mikrofon untuk dikte", "Microphone access is needed to dictate"))
     }
     DisposableEffect(Unit) { onDispose { d.stop() } }
     val start = {
