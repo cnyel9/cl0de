@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "opencode-mobile"
+rootProject.name = "cl0de"
 include(":app")

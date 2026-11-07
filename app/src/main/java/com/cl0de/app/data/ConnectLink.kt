@@ -8,7 +8,7 @@ import com.cl0de.app.Graph
 
 /**
  * Connecting to a computer by QR code. The code holds a link
- * `cl0udly://connect?n=<name>&u=<server address>&p=<password>`, shown by `tools/connect-qr.sh`
+ * `Cl0de://connect?n=<name>&u=<server address>&p=<password>`, shown by `tools/connect-qr.sh`
  * (and later by the desktop app). Scanned in the app or opened as a link:
  * first we ask "connect?", and only then add the device.
  */
@@ -20,7 +20,7 @@ object ConnectLink {
 
     fun parse(raw: String): Offer? = runCatching {
         val u = Uri.parse(raw.trim())
-        if (!u.scheme.equals("cl0udly", true) || !u.host.equals("connect", true)) return null
+        if (!u.scheme.equals("cl0de", true) || !u.host.equals("connect", true)) return null
         val url = u.getQueryParameter("u")?.takeIf { it.isNotBlank() } ?: return null
         Offer(u.getQueryParameter("n").orEmpty(), Devices.normalize(url), u.getQueryParameter("p").orEmpty())
     }.getOrNull()

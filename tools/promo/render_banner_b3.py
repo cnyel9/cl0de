@@ -35,7 +35,7 @@ def main(shots, out):
         d.ellipse([x + 18, cy + 20, x + 30, cy + 32], fill=dot)
         d.text((x + 42, cy + 26), label, font=f, fill=TEXT, anchor="lm")
         x += wd + 62 + 12
-    text(c, (72, H - 54), "github.com/mistqkw/opencode-mobile", "mono", 24, DIM)
+    text(c, (72, H - 54), "github.com/cnyel9/cl0de", "mono", 24, DIM)
 
     names = ["skills", "slash", "github-code"]
     specs = [(-9, 690, 170), (0, 830, 120), (9, 975, 190)]

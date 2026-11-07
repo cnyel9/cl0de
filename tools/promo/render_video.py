@@ -166,7 +166,7 @@ def render(shots_dir, out, audio=None):
             a2 = out_cubic((t - 19.5) / 0.5)
             if a2 > 0:
                 f = font("mono", 38)
-                s = "github.com/mistqkw/opencode-mobile"
+                s = "github.com/cnyel9/cl0de"
                 wd = ImageDraw.Draw(c).textlength(s, font=f)
                 x0, yy = W / 2 - wd / 2 - 40, y0 + hh + 210 + (1 - a2) * 40
                 layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))

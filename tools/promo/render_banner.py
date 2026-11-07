@@ -37,7 +37,7 @@ def main(shots, out):
         d.rounded_rectangle([x, cy, x + wd + 36, cy + 52], radius=r, fill=PANEL, outline=LINE, width=2)
         d.text((x + 18, cy + 26), label, font=f, fill=TEXT, anchor="lm")
         x += wd + 36 + 14
-    text(c, (72, H - 54), "github.com/mistqkw/opencode-mobile", "mono", 24, DIM)
+    text(c, (72, H - 54), "github.com/cnyel9/cl0de", "mono", 24, DIM)
 
     names = ["claude-home", "terminal-home", "desktop-home"]
     specs = [(-9, 700, 170), (0, 830, 130), (9, 960, 190)]  # angle, x, y

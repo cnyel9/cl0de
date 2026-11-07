@@ -13,7 +13,7 @@ import com.cl0de.app.Graph
  * The server password and tokens are cut out of the log.
  */
 object BugReport {
-    private const val REPO = "mistqkw/opencode-mobile"
+    private const val REPO = "cnyel9/cl0de"
     // GitHub cuts links that are too long; the log is shortened so everything fits
     private const val MAX_URL = 7000
 
