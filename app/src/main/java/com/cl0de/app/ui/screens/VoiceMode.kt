@@ -146,6 +146,41 @@ fun VoiceMode(sessionId: String?, onClose: (String?) -> Unit) {
         }
     }
 
+    fun listen() {
+        if (!granted) { perm.launch(Manifest.permission.RECORD_AUDIO); return }
+        if (muted) { talk = Talk.Idle; return }
+        val r = recognizer ?: run {
+            // No system recognition service on this device: the offline Whisper engine is the way in.
+            if (com.cl0de.app.data.OfflineSpeech.isReady(ctx)) startOfflineListen()
+            else caption = SMisc.speechNotAvailable
+            return
+        }
+        talk = Talk.Listening; caption = ""
+        r.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {}
+            override fun onBeginningOfSpeech() {}
+            override fun onRmsChanged(rmsdB: Float) { level = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f) }
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() { level = 0f }
+            override fun onError(error: Int) {
+                level = 0f
+                // silence or not understood: just keep listening
+                if (talk == Talk.Listening && (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT)) scope.launch { delay(250); listen() }
+                else if (talk == Talk.Listening) talk = Talk.Idle
+            }
+            override fun onResults(results: Bundle?) {
+                level = 0f
+                val t = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
+                if (t.isBlank()) scope.launch { delay(200); listen() } else ask(t)
+            }
+            override fun onPartialResults(partial: Bundle?) {
+                partial?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.let { if (it.isNotBlank()) caption = it }
+            }
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        })
+        r.startListening(com.cl0de.app.data.Speech.recognizerIntent())
+    }
+
     fun startOfflineListen() {
         talk = Talk.Listening; caption = ""
         synchronized(offlineChunks) { offlineChunks.clear() }
@@ -181,40 +216,6 @@ fun VoiceMode(sessionId: String?, onClose: (String?) -> Unit) {
         }
     }
 
-    fun listen() {
-        if (!granted) { perm.launch(Manifest.permission.RECORD_AUDIO); return }
-        if (muted) { talk = Talk.Idle; return }
-        val r = recognizer ?: run {
-            // No system recognition service on this device: the offline Whisper engine is the way in.
-            if (com.cl0de.app.data.OfflineSpeech.isReady(ctx)) startOfflineListen()
-            else caption = SMisc.speechNotAvailable
-            return
-        }
-        talk = Talk.Listening; caption = ""
-        r.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(params: Bundle?) {}
-            override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(rmsdB: Float) { level = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f) }
-            override fun onBufferReceived(buffer: ByteArray?) {}
-            override fun onEndOfSpeech() { level = 0f }
-            override fun onError(error: Int) {
-                level = 0f
-                // silence or not understood: just keep listening
-                if (talk == Talk.Listening && (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT)) scope.launch { delay(250); listen() }
-                else if (talk == Talk.Listening) talk = Talk.Idle
-            }
-            override fun onResults(results: Bundle?) {
-                level = 0f
-                val t = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
-                if (t.isBlank()) scope.launch { delay(200); listen() } else ask(t)
-            }
-            override fun onPartialResults(partial: Bundle?) {
-                partial?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.let { if (it.isNotBlank()) caption = it }
-            }
-            override fun onEvent(eventType: Int, params: Bundle?) {}
-        })
-        r.startListening(com.cl0de.app.data.Speech.recognizerIntent())
-    }
     listenNext = { listen() }
 
     DisposableEffect(Unit) {
@@ -223,7 +224,7 @@ fun VoiceMode(sessionId: String?, onClose: (String?) -> Unit) {
                 // An engine object can exist while no engine or voice data is actually installed:
                 // detect that once and say so plainly instead of failing silently on every reply.
                 val avail = runCatching { tts?.setLanguage(com.cl0de.app.data.Speech.ttsLocale("test")) }.getOrNull()
-                if (avail == TextToSpeech.LANG_MISSING_DATA || avail == TextToSpeech.LANG_NOT_AVAILABLE) {
+                if (avail == TextToSpeech.LANG_MISSING_DATA || avail == TextToSpeech.LANG_NOT_SUPPORTED) {
                     ttsMissing = true
                     Graph.chats.toasts.tryEmit(SVoice.ttsMissing)
                 }
