@@ -7,6 +7,7 @@ import androidx.core.content.ContextCompat
 import com.cl0de.app.api.OpenCodeApi
 import com.cl0de.app.data.Prefs
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -15,6 +16,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.net.InetSocketAddress
+import java.net.ServerSocket
 import java.util.concurrent.TimeUnit
 
 /**
@@ -35,6 +38,11 @@ class RuntimeController(
         const val OC_SHA = "8568230ccd847dc93e95b9f6894379077d3e014a16b48040743573e77c23e85f"
         const val OC_BIN = "/usr/local/bin/opencode"
         fun ocUrl(v: String) = "https://github.com/anomalyco/opencode/releases/download/v$v/opencode-linux-arm64.tar.gz"
+        // Slow-device supervision: a fresh serve on a heavy phone can take minutes to
+        // load its providers, so the startup grace is long and the watchdog only ever
+        // judges a server that already answered a health check once.
+        const val WATCHDOG_INTERVAL_MS = 20_000L
+        const val PORT_FREE_WAIT_MS = 90_000L
     }
 
     val state = MutableStateFlow<RuntimeState>(
@@ -174,7 +182,37 @@ class RuntimeController(
         stopRequested = false
         var failures = 0
         var windowStart = System.currentTimeMillis()
+
+        // Never race the runtime install/configuration (rootfs unpacking, apt, the
+        // OpenCode install): serve only starts once that phase is over and the rootfs
+        // carries the .oc-configured flag. Starting serve in the middle of it was one
+        // half of the crash loop seen after an update.
+        if (installing || !paths.rootfsReady) {
+            logLine("Server start postponed: the runtime setup is still running")
+            while (isActive && !stopRequested && (installing || !paths.rootfsReady)) {
+                val s = state.value
+                if (s is RuntimeState.InstallFailed || (s is RuntimeState.NotInstalled && !installing)) {
+                    logLine("Server not started: the runtime setup did not complete")
+                    return@withContext
+                }
+                delay(1000)
+            }
+            if (stopRequested || !isActive) { state.value = RuntimeState.Stopped; return@withContext }
+            logLine("Runtime setup finished: starting the server")
+        }
+
         while (isActive && !stopRequested) {
+            // Never spawn on top of a predecessor that still holds the port: the new
+            // serve then dies at once with ServeError (exit code 1) and the supervisor
+            // restarts it into the same wall, over and over.
+            val port = prefs.serverPort.toIntOrNull() ?: 4096
+            if (!awaitPortFree(port)) {
+                if (stopRequested) break
+                failures++
+                state.value = RuntimeState.Crashed("Port $port is still in use. Restarting…")
+                delay((1500L * failures).coerceAtMost(30_000))
+                continue
+            }
             state.value = RuntimeState.Starting
             val cmd = proot.build(
                 listOf(OC_BIN, "serve", "--hostname", "127.0.0.1", "--port", prefs.serverPort),
@@ -186,39 +224,65 @@ class RuntimeController(
             )
             val pb = ProcessBuilder(cmd).redirectErrorStream(true)
             pb.environment().putAll(proot.env())
+            val spawnedAt = System.currentTimeMillis()
             val p = try { pb.start() } catch (e: Exception) {
+                logLine("Could not start proot: ${e.message}")
+                failures++
                 state.value = RuntimeState.Crashed("Could not start proot: ${e.message}")
-                return@withContext
+                delay((1500L * failures).coerceAtMost(30_000))
+                continue
             }
             process = p
+            logLine("Server process started on port $port, waiting for it to answer…")
             val reader = launch { runCatching { p.inputStream.bufferedReader().forEachLine { logLine(it) } } }
+            var version: String? = null
+            var dog: Job? = null
             try {
-                var version: String? = null
-                val deadline = System.currentTimeMillis() + 120_000
-                while (isActive && p.isAlive && System.currentTimeMillis() < deadline && version == null) {
-                    val t0 = System.currentTimeMillis()
-                    version = try { api.healthVersionOrThrow() } catch (e: Exception) { android.util.Log.d("ocm-health", "err ${e.javaClass.simpleName} ${e.message}"); logLine("health: ${e.javaClass.simpleName} ${e.message}"); null }
-                    android.util.Log.d("ocm-health", "version=$version in ${System.currentTimeMillis() - t0}ms")
-                    if (version == null) delay(250)
+                // Startup grace: poll quietly (the old 250 ms loop flooded the log with
+                // one line per failed knock and pushed the real messages out). A failure
+                // here never counts and never restarts anything: a server that is still
+                // loading its providers is not a hung server.
+                var firstErr = true
+                var lastNote = 0L
+                while (isActive && p.isAlive && version == null) {
+                    version = try { api.healthVersionOrThrow() } catch (e: Exception) {
+                        if (firstErr) { firstErr = false; logLine("Server is loading (health not answering yet: ${e.javaClass.simpleName})") }
+                        null
+                    }
+                    if (version == null) {
+                        val elapsed = System.currentTimeMillis() - spawnedAt
+                        if (elapsed - lastNote >= 30_000) { lastNote = elapsed; logLine("Still starting… ${elapsed / 1000}s elapsed") }
+                        delay(1000)
+                    }
                 }
                 if (version != null) {
                     state.value = RuntimeState.Running(version)
                     prefs.opencodeVersion = version
                     failures = 0
-                }
-                // Watchdog: the process is alive but not answering (hung), so restart it instead of waiting forever.
-                val dog = launch {
-                    var bad = 0
-                    while (isActive && p.isAlive) {
-                        delay(15_000)
-                        val ok = runCatching { kotlinx.coroutines.withTimeout(10_000) { api.healthVersionOrThrow() } }.isSuccess
-                        bad = if (ok) 0 else bad + 1
-                        if (bad >= 3) { logLine("Server stopped answering — restarting"); p.destroy(); break }
+                    windowStart = System.currentTimeMillis()
+                    logLine("Server is up: OpenCode $version on port $port (took ${(System.currentTimeMillis() - spawnedAt) / 1000}s to answer)")
+                    // Watchdog: only judges a server that already answered once, with a
+                    // patient per-check timeout, so a busy-but-alive server on a slow
+                    // phone is not mistaken for a hung one.
+                    dog = launch {
+                        var bad = 0
+                        while (isActive && p.isAlive) {
+                            delay(WATCHDOG_INTERVAL_MS)
+                            val err = try { if (api.healthVersionPatient() != null) null else "health answered but not healthy" }
+                                catch (e: Exception) { "${e.javaClass.simpleName}: ${e.message}" }
+                            if (err == null) {
+                                bad = 0
+                            } else {
+                                bad++
+                                logLine("Watchdog: health check failed ($bad/3): $err")
+                                if (bad >= 3) { logLine("Watchdog: server stopped answering — restarting it"); p.destroy(); break }
+                            }
+                        }
                     }
                 }
                 runInterruptible { p.waitFor() }
-                dog.cancel()
             } finally {
+                dog?.cancel()
                 p.destroy()
                 if (p.isAlive) { runCatching { p.waitFor(3, TimeUnit.SECONDS) }; if (p.isAlive) p.destroyForcibly() }
                 process = null
@@ -226,15 +290,37 @@ class RuntimeController(
             }
             if (stopRequested) break
             val code = runCatching { p.exitValue() }.getOrDefault(-1)
-            logLine("Server exited (code $code)")
             val now = System.currentTimeMillis()
             if (now - windowStart > 120_000) { failures = 0; windowStart = now }
             failures++
+            val restartIn = (1500L * failures).coerceAtMost(30_000)
+            logLine(
+                "Server exited (code $code) after ${(now - spawnedAt) / 1000}s" +
+                    (if (version == null) ", before it ever answered a health check" else "") +
+                    " — restarting in ${restartIn / 1000}s"
+            )
             state.value = RuntimeState.Crashed("Server stopped (code $code). Restarting…")
             // don't give up: restart with a growing pause (up to 30 s) until the user stops the server
-            delay((1500L * failures).coerceAtMost(30_000))
+            delay(restartIn)
         }
         state.value = RuntimeState.Stopped
+    }
+
+    /** True once nothing listens on [port] anymore; waits a bounded while for a dying predecessor to release it. */
+    private suspend fun awaitPortFree(port: Int): Boolean {
+        fun free(): Boolean = try {
+            ServerSocket().apply { reuseAddress = true; bind(InetSocketAddress("127.0.0.1", port)); close() }
+            true
+        } catch (e: Exception) { false }
+        if (free()) return true
+        logLine("Port $port is still held by the previous server — waiting for it to free up")
+        val deadline = System.currentTimeMillis() + PORT_FREE_WAIT_MS
+        while (!stopRequested && System.currentTimeMillis() < deadline) {
+            delay(1000)
+            if (free()) { logLine("Port $port is free again"); return true }
+        }
+        if (!stopRequested) logLine("Port $port is still busy after ${PORT_FREE_WAIT_MS / 1000}s — not starting on top of it")
+        return !stopRequested && free()
     }
 
     /** The user stopped the server: then we don't start it when they come back to the app. */
