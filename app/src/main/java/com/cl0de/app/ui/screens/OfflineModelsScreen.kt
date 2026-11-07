@@ -23,6 +23,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -186,7 +188,14 @@ private fun ModelCard(m: OfflineModel, ramBytes: Long, llama: LlamaState, tick: 
             Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Chip(mb(m.totalBytes))
                 Chip(SOffline.minRam(fmtGb(m.minRamGb)))
-                if (benchRes != null) Chip(SOffline.benchResult("%.1f".format(benchRes.first), "%.1f".format(benchRes.second)))
+            }
+            if (benchRes != null) {
+                // the bench result gets its own full-width block: inside the row above,
+                // its long text overflowed the card and the start of it was clipped away
+                Chip(
+                    SOffline.benchResult("%.1f".format(benchRes.first), "%.1f".format(benchRes.second)),
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                )
             }
             when {
                 dl != null && !dl.failed -> {
@@ -210,18 +219,28 @@ private fun ModelCard(m: OfflineModel, ramBytes: Long, llama: LlamaState, tick: 
                 }
                 downloaded -> {
                     Spacer(Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         SmallButton(
                             if (isActive) SOffline.activeLabel else SOffline.use,
                             { OfflineModels.useModel(m) },
                             filled = !isActive,
                         )
                         when (bench) {
-                            "running" -> Txt(SOffline.benchRunning, size = 14.sp, color = c.textDim)
-                            else -> SmallButton(SOffline.benchButton, { OfflineModels.bench(m) })
+                            // the running-status text is the only flexible element: it
+                            // shrinks and wraps into whatever space the buttons leave,
+                            // so no button is ever squeezed below its natural width
+                            "running" -> Txt(SOffline.benchRunning, size = 14.sp, color = c.textDim, modifier = Modifier.weight(1f))
+                            else -> {
+                                SmallButton(SOffline.benchButton, { OfflineModels.bench(m) })
+                                Spacer(Modifier.weight(1f))
+                            }
                         }
-                        Spacer(Modifier.weight(1f))
-                        SmallButton(S.delete, { onDelete(m) }, danger = true)
+                        // delete is an icon-only button by request: no text label
+                        IconBtn(
+                            Ic.Trash, { onDelete(m) },
+                            modifier = Modifier.semantics { contentDescription = S.delete },
+                            tint = c.danger, size = 40.dp, iconSize = 20.dp,
+                        )
                     }
                     if (bench == "failed") Txt(SOffline.benchFailed, size = 14.sp, color = c.danger, modifier = Modifier.padding(top = 6.dp))
                     if (isStarting) Txt(SOffline.serverStarting(m.displayName), size = 14.sp, color = c.textDim, modifier = Modifier.padding(top = 6.dp))
