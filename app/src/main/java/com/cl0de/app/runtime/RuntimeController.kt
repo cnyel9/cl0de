@@ -456,6 +456,15 @@ class RuntimeController(
             if (remembered.isBlank() || remembered == "auto") fullChain
             else fullChain.filter { it.first == remembered } + fullChain.filter { it.first != remembered }
         var failures = 0
+        // one display name per backend way, shared by every line that mentions it
+        fun backendName(label: String): String = if (label == "auto") "automatic discovery" else label
+        // ONE atomic line per death, written only once the decision is known (the
+        // OpenCode supervisor's shape): exit code, lifetime, whether it ever answered
+        // a health check, the model and backend that died, and what happens next
+        fun deathLine(code: Int, aliveSec: Long, wasHealthy: Boolean, backend: String, nextAction: String): String =
+            "server exited (code $code) after ${aliveSec}s" +
+                (if (wasHealthy) ", after it had answered a health check" else ", before it ever answered a health check") +
+                ", model: $modelId, backend: $backend — $nextAction"
         while (isActive && !llamaStopRequested) {
             if (!awaitLlamaPortFree()) {
                 if (llamaStopRequested) break
@@ -465,7 +474,14 @@ class RuntimeController(
                 continue
             }
             var served = false
-            chain@ for ((label, env) in candidates) {
+            // the last death of this round: recorded where the process dies, logged
+            // once, where the decision is made (next backend / giving up / restart)
+            var lastExitCode: Int? = null
+            var lastAliveSec = 0L
+            var lastHealthy = false
+            var lastBackend = ""
+            chain@ for ((index, cand) in candidates.withIndex()) {
+                val (label, env) = cand
                 if (llamaStopRequested || !isActive) break@chain
                 llamaState.value = LlamaState.Starting(modelId)
                 val argv = buildList {
@@ -484,7 +500,7 @@ class RuntimeController(
                     break@chain
                 }
                 llamaProcess = p
-                llamaLog("server process started for $modelId (backend: ${if (label == "auto") "automatic discovery" else label}), waiting for it to answer…")
+                llamaLog("server process started for $modelId (backend: ${backendName(label)}), waiting for it to answer…")
                 val recent = java.util.Collections.synchronizedList(mutableListOf<String>())
                 val reader = launch { runCatching { p.inputStream.bufferedReader().forEachLine { l -> recent.add(l); if (recent.size > 200) recent.removeAt(0); llamaLog(l) } } }
                 var healthy = false
@@ -499,7 +515,7 @@ class RuntimeController(
                         prefs.llamaBackend = label
                         llamaState.value = LlamaState.Running(modelId)
                         failures = 0
-                        llamaLog("server is up: $modelId on port $LLAMA_PORT (took ${(System.currentTimeMillis() - spawnedAt) / 1000}s, backend: ${if (label == "auto") "automatic discovery" else label})")
+                        llamaLog("server is up: $modelId on port $LLAMA_PORT (took ${(System.currentTimeMillis() - spawnedAt) / 1000}s, backend: ${backendName(label)})")
                         dog = launch {
                             var bad = 0
                             while (isActive && !llamaStopRequested && p.isAlive) {
@@ -525,19 +541,22 @@ class RuntimeController(
                     reader.cancel()
                 }
                 if (llamaStopRequested || !isActive) break@chain
-                val exitCode = runCatching { p.exitValue() }.getOrDefault(-1)
-                llamaLog(
-                    "server exited (code $exitCode) after ${(System.currentTimeMillis() - spawnedAt) / 1000}s" +
-                        (if (!healthy) ", before it ever answered a health check" else "")
-                )
-                if (served) break@chain // it ran and ended: the outer loop restarts it whole
+                // record the death now; its one atomic line is written where the
+                // decision is made below (or by the outer restart), never in fragments
+                lastExitCode = runCatching { p.exitValue() }.getOrDefault(-1)
+                lastAliveSec = (System.currentTimeMillis() - spawnedAt) / 1000
+                lastHealthy = healthy
+                lastBackend = backendName(label)
+                if (served) break@chain // it ran and ended: the outer loop restarts it whole and logs the death there
                 val noBackend = synchronized(recent) { recent.any { it.contains("no backends are loaded") } }
-                if (noBackend && label != candidates.last().first) {
-                    llamaLog("ggml found no CPU backend via ${if (label == "auto") "automatic discovery" else label}, trying the next way")
+                if (noBackend && index < candidates.lastIndex) {
+                    llamaLog(deathLine(lastExitCode!!, lastAliveSec, lastHealthy, lastBackend, "trying next backend: ${backendName(candidates[index + 1].first)}"))
+                    lastExitCode = null
                     continue@chain
                 }
                 if (noBackend) {
-                    llamaLog("no CPU backend could be loaded by any of the ${candidates.size} ways, giving up")
+                    llamaLog(deathLine(lastExitCode!!, lastAliveSec, lastHealthy, lastBackend, "giving up"))
+                    lastExitCode = null
                     llamaState.value = LlamaState.Failed(SOffline.failNoBackend)
                 }
                 break@chain
@@ -546,7 +565,15 @@ class RuntimeController(
             if (llamaState.value is LlamaState.Failed) break
             failures++
             val restartIn = (1500L * failures).coerceAtMost(30_000)
-            llamaLog("restarting in ${restartIn / 1000}s")
+            val death = lastExitCode
+            if (death != null) {
+                // a death that reached the outer loop (it served, or died for a
+                // non-backend reason) gets its atomic line here, with the restart
+                llamaLog(deathLine(death, lastAliveSec, lastHealthy, lastBackend, "restarting in ${restartIn / 1000}s (failure $failures)"))
+                lastExitCode = null
+            } else {
+                llamaLog("restarting in ${restartIn / 1000}s")
+            }
             llamaState.value = LlamaState.Starting(modelId)
             delay(restartIn)
         }

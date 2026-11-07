@@ -1,5 +1,6 @@
 package com.cl0de.app.data
 
+import com.cl0de.app.Graph
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -48,6 +49,10 @@ class Devices(private val prefs: Prefs) {
         prefs.currentDir = prefs.getDir(id) ?: if (id.isEmpty()) "/root/work" else ""
         prefs.activeDevice = id
         activeId.value = id
+        // a remote device cannot use the local offline provider at all: an
+        // orphaned llama-server would keep holding its ~1.4 GB of RAM for
+        // nothing (coming back local needs nothing, ensureForSend restarts it)
+        if (id.isNotEmpty()) Graph.runtime.stopLlama()
     }
 
     companion object {

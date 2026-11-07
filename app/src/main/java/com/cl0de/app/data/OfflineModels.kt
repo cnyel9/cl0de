@@ -151,8 +151,16 @@ object OfflineModels {
                 // total failure deletes EVERY file of the model, not just the partial
                 // one: a companion file that already finished (the main file of a
                 // vision model, gigabytes) must not survive either, so the next try
-                // starts from a clean zero
+                // starts from a clean zero. One exception: a filename another fully
+                // downloaded model claims is that model's file, not this one's debris
+                // (the Gemma 4 pair shares the mmproj name mmproj-F16.gguf, at
+                // different sizes, so one model's cleanup must not eat the other's)
+                val claimedElsewhere = OfflineCatalog.all
+                    .filter { it.id != m.id && isDownloaded(it) }
+                    .flatMap { o -> o.files.map { f -> f.filename } }
+                    .toSet()
                 m.files.forEach { f ->
+                    if (f.filename in claimedElsewhere) return@forEach
                     hostFile(f).delete()
                     File(modelsDir(), f.filename + ".part").delete()
                 }
@@ -300,18 +308,19 @@ object OfflineModels {
         scope.launch {
             // the bench loads its own copy of the model: the server must not hold RAM at the same time
             Graph.runtime.stopLlama()
-            val remembered = Graph.prefs.llamaBackend
+            // the same chain as the server supervisor: the remembered way goes
+            // first, but the chain is always complete, it never narrows to it
             val v2 = "${RuntimeController.LLAMA_DIR}/libggml-cpu-armv8.2_2.so"
             val v1 = "${RuntimeController.LLAMA_DIR}/libggml-cpu-armv8.2_1.so"
-            val candidates: List<Pair<String, Map<String, String>>> = when {
-                remembered == "auto" -> listOf("auto" to emptyMap())
-                remembered.isNotBlank() -> listOf(remembered to mapOf("GGML_BACKEND_PATH" to remembered))
-                else -> listOf(
-                    "auto" to emptyMap(),
-                    v2 to mapOf("GGML_BACKEND_PATH" to v2),
-                    v1 to mapOf("GGML_BACKEND_PATH" to v1),
-                )
-            }
+            val fullChain: List<Pair<String, Map<String, String>>> = listOf(
+                "auto" to emptyMap(),
+                v2 to mapOf("GGML_BACKEND_PATH" to v2),
+                v1 to mapOf("GGML_BACKEND_PATH" to v1),
+            )
+            val remembered = Graph.prefs.llamaBackend
+            val candidates: List<Pair<String, Map<String, String>>> =
+                if (remembered.isBlank() || remembered == "auto") fullChain
+                else fullChain.filter { it.first == remembered } + fullChain.filter { it.first != remembered }
             var pp: Double? = null
             var tg: Double? = null
             for ((label, env) in candidates) {
@@ -337,7 +346,9 @@ object OfflineModels {
                     break
                 }
                 pp = null; tg = null
-                if (!text.contains("backend", ignoreCase = true)) break // not a backend problem: don't burn time on retries
+                // only the server's exact failure phrase moves on to the next way;
+                // anything else is not a backend problem: don't burn time on retries
+                if (!text.contains("no backends are loaded")) break
             }
             if (pp != null && tg != null) {
                 val o = runCatching { JSONObject(Graph.prefs.offlineBench) }.getOrDefault(JSONObject())
