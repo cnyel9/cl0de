@@ -46,10 +46,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          APK="opencode-mobile-$TAG.apk"
+          APK="cl0de-$TAG.apk"
           cp app/build/outputs/apk/release/app-release.apk "$APK"
           NOTES="docs/releases/$TAG.md"
-          [ -f "$NOTES" ] || echo "OpenCode mobile $TAG" > "$NOTES"
+          [ -f "$NOTES" ] || echo "Cl0de $TAG" > "$NOTES"
           PRE=""; case "$TAG" in *alpha*|*beta*|*rc*) PRE="--prerelease";; esac
           NAME="${TAG/-beta-/ beta-}"
           if gh release view "$TAG" >/dev/null 2>&1; then

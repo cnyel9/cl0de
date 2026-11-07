@@ -60,7 +60,6 @@ This is a beta and there are bugs. Please report them in [Issues](../../issues).
 - `data/` holds chat state from SSE, the model catalog, usage tracking, memory, skills, GitHub sign-in, the phone MCP server (`PhoneBridge`), backup and updates.
 - `ui/` contains the Compose screens. Looks are defined in `ui/theme/Looks.kt`.
 - `tools/connect-qr.sh` starts OpenCode on a computer and prints the QR code for the app.
-- `tools/promo/` has the scripts that render the promo video and banners.
 
 OpenCode is pinned to 1.19.4 (`RuntimeController.OC_VERSION`), the version the client is tested against.
 
@@ -80,6 +79,6 @@ Phones other than a Pixel, Android 14–16 on other firmware, light themes of ev
 
 ## License
 
-The app's own code is MIT (see `LICENSE`).
+Cl0de's own code is MIT (see `LICENSE`).
 
 Cl0de is an unofficial client and is not affiliated with the OpenCode developers. "OpenCode" is the name of their project (MIT). The app includes proot and libtalloc from Termux (GPL-2.0 / LGPL-3.0), whose sources are in the Termux project, and downloads Ubuntu Base 24.04 and OpenCode on first launch. Those components keep their own licenses. Fonts: Inter, Source Serif 4, Unbounded and JetBrains Mono, all SIL OFL 1.1.
