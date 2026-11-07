@@ -116,6 +116,12 @@ class Prefs(ctx: Context) {
     var runtimeReady by bool("runtime_ready", false)
     var opencodeVersion by str("opencode_version", "")
 
+    // Offline models (llama-server in the same rootfs)
+    /** How ggml found its CPU backend last time: "", "auto", or a guest path to a backend .so. */
+    var llamaBackend by str("llama_backend", "")
+    /** Speed test results per offline model: JSON {modelId: [pp, tg]} in tokens/sec. */
+    var offlineBench by str("offline_bench", "{}")
+
     // Model / mode selection
     var providerId by str("model_provider", "")
     var modelId by str("model_id", "")

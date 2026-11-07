@@ -62,6 +62,7 @@ import com.cl0de.app.Graph
 import com.cl0de.app.data.Attachment
 import com.cl0de.app.data.S
 import com.cl0de.app.data.SChat
+import com.cl0de.app.data.SOffline
 import com.cl0de.app.data.Attachments
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.Route
@@ -342,7 +343,7 @@ fun ComposerHost(
     }
     var allModels by remember { mutableStateOf(false) }
     if (state.showModel && look.kimiLike && !allModels) KimiModelPanel(onDismiss = { state.showModel = false }, onMore = { allModels = true })
-    else if (state.showModel) ModelSheet(onDismiss = { state.showModel = false; allModels = false }, start = if (allModels) "all" else "main")
+    else if (state.showModel) ModelSheet(onDismiss = { state.showModel = false; allModels = false }, start = if (allModels) "all" else "main", onOfflineModels = { state.showModel = false; allModels = false; nav.push(Route.OfflineModels) })
 }
 
 @Composable
@@ -465,7 +466,7 @@ private fun Tile(label: String, icon: androidx.compose.ui.graphics.vector.ImageV
 }
 
 @Composable
-fun ModelSheet(start: String = "main", onDismiss: () -> Unit) {
+fun ModelSheet(start: String = "main", onDismiss: () -> Unit, onOfflineModels: (() -> Unit)? = null) {
     val c = Oc.c
     val prefs = Graph.prefs
     val providers by Graph.catalog.providers.collectAsState()
@@ -492,11 +493,14 @@ fun ModelSheet(start: String = "main", onDismiss: () -> Unit) {
         }
         val claudeEd = Oc.claudeLike
         if (claudeEd && page == "main") {
-            ClaudeModelMain(current, onDismiss = onDismiss, onEffort = { page = "effort" }, onMore = { page = "all" })
+            ClaudeModelMain(current, onDismiss = onDismiss, onEffort = { page = "effort" }, onMore = { page = "all" }, onOffline = { onDismiss(); onOfflineModels?.invoke() })
             return@PickerFrame
         }
         PickSearch(query, { query = it }, SChat.searchModels)
         LazyColumn(Modifier.heightIn(max = 520.dp).padding(bottom = if (claudeEd) 24.dp else 8.dp)) {
+            if (onOfflineModels != null) item {
+                PickRow(SOffline.title, { onDismiss(); onOfflineModels() }, icon = Ic.Download, chevron = true)
+            }
             if (!claudeEd && current != null && current.variantNames.isNotEmpty()) item {
                 PickRow(SChat.effortLabel, { page = "effort" }, trailing = prefs.variant.ifBlank { SChat.defaultLabel }.replaceFirstChar { it.uppercase() }, chevron = true)
             }
@@ -542,11 +546,13 @@ internal fun pickModel(providerId: String, m: com.cl0de.app.api.ModelInfo) {
     if (prefs.variant !in m.variantNames) prefs.variant = ""
     val key = "$providerId/${m.id}"
     prefs.recentModels = (listOf(key) + prefs.recentModels.split(',').filter { it.isNotBlank() && it != key }).take(6).joinToString(",")
+    // switching to a cloud model releases the offline model's RAM: the local server stops
+    if (providerId != com.cl0de.app.data.OfflineModels.ID) Graph.runtime.stopLlama()
 }
 
 /** The main model picker page, like Claude mobile: a short list as a card, a hint, Effort and "More models". */
 @Composable
-private fun ClaudeModelMain(current: com.cl0de.app.api.ModelInfo?, onDismiss: () -> Unit, onEffort: () -> Unit, onMore: () -> Unit) {
+private fun ClaudeModelMain(current: com.cl0de.app.api.ModelInfo?, onDismiss: () -> Unit, onEffort: () -> Unit, onMore: () -> Unit, onOffline: () -> Unit) {
     val c = Oc.c
     val prefs = Graph.prefs
     val providers by Graph.catalog.providers.collectAsState()
@@ -604,6 +610,7 @@ private fun ClaudeModelMain(current: com.cl0de.app.api.ModelInfo?, onDismiss: ()
         }
         SettingsGroup {
             SettingsRow(SChat.moreModels, chevron = true, onClick = onMore)
+            SettingsRow(SOffline.title, chevron = true, onClick = onOffline)
         }
     }
 }

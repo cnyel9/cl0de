@@ -252,6 +252,9 @@ class ChatHub(private val api: OpenCodeApi, private val events: EventHub, privat
     private val ruled = HashMap<String, String>()
 
     suspend fun send(ctx: Context, sessionId: String, text: String, atts: List<Attachment>, keepParts: List<JsonObject> = emptyList()) {
+        // offline models: the local server must be healthy with the chosen model before anything
+        // is sent (and with a cloud model selected it must not be running at all)
+        OfflineModels.ensureForSend()
         val dir = session(sessionId)?.directory
         if (ruled[sessionId] != prefs.permissionMode) runCatching {
             api.setSessionPermission(sessionId, dir, permissionRules() ?: JsonArray(emptyList()))

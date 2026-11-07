@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.cl0de.app.Graph
 import com.cl0de.app.data.S
+import com.cl0de.app.data.SOffline
 import com.cl0de.app.data.SSet
 import com.cl0de.app.runtime.RuntimeState
 import com.cl0de.app.ui.Nav
@@ -138,6 +139,7 @@ fun SettingsScreen(nav: Nav, onMenu: () -> Unit) {
             SettingsGroup {
                 SettingsRow(SSet.capabilities, subtitle = listOfNotNull(SSet.memory.takeIf { prefs.memoryEnabled }, modelLabel.takeIf { it.isNotBlank() }).joinToString(" · "), icon = Ic.Sliders, onClick = { nav.push(Route.Capabilities) })
                 SettingsRow("OpenCode", subtitle = serverText, icon = Ic.Terminal, onClick = { nav.push(Route.OcSettings) })
+                SettingsRow(SOffline.title, subtitle = SOffline.settingsSubtitle, icon = Ic.Download, onClick = { nav.push(Route.OfflineModels) })
                 SettingsRow(SSet.connectors, subtitle = SSet.mcpServers, icon = Ic.Puzzle, onClick = { nav.push(Route.Connectors) })
                 SettingsRow("GitHub", subtitle = if (com.cl0de.app.data.GitHub.signedIn) "@" + prefs.githubLogin else SSet.letOpenCodeWorkRepos, icon = Ic.GitHub, onClick = { nav.push(Route.GitHub) })
                 SettingsRow(SSet.phoneTools, subtitle = if (prefs.phoneTools) SSet.phoneToolsOn else S.off, icon = Ic.Phone, onClick = { nav.push(Route.PhoneTools) })
@@ -193,7 +195,7 @@ fun SettingsScreen(nav: Nav, onMenu: () -> Unit) {
         "scale" -> ChoiceDialog(SSet.displaySize, listOf(Triple("90", SSet.compactLabel, null), Triple("100", SSet.defaultLabel, null), Triple("110", SSet.largeLabel, null), Triple("120", SSet.extraLargeLabel, null)), prefs.uiScale, { prefs.uiScale = it }) { dialog = null }
         "code" -> ChoiceDialog(SSet.codeFont, listOf(Triple("mono", SSet.monospaceLabel, null), Triple("system", SSet.systemLabel, null)), prefs.codeFont, { prefs.codeFont = it }) { dialog = null }
     }
-    if (modelSheet) ModelSheet { modelSheet = false }
+    if (modelSheet) ModelSheet(onDismiss = { modelSheet = false }, onOfflineModels = { modelSheet = false; nav.push(Route.OfflineModels) })
     if (iconSheet) IconPickerSheet { iconSheet = false }
 }
 
@@ -219,7 +221,7 @@ fun CapabilitiesScreen(nav: Nav) {
             }
         }
     }
-    if (modelSheet) ModelSheet { modelSheet = false }
+    if (modelSheet) ModelSheet(onDismiss = { modelSheet = false }, onOfflineModels = { modelSheet = false; nav.push(Route.OfflineModels) })
 }
 
 /** "OpenCode": the server on the phone, providers, config, like the Claude Code section in Claude. */

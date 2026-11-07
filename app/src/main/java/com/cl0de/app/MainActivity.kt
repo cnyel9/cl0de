@@ -39,7 +39,11 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStart() { super.onStart(); Graph.chats.foreground = true; com.cl0de.app.data.LiveNotify.onForeground() }
-    override fun onStop() { super.onStop(); Graph.chats.foreground = false; com.cl0de.app.data.LiveNotify.onBackground() }
+    override fun onStop() {
+        super.onStop(); Graph.chats.foreground = false; com.cl0de.app.data.LiveNotify.onBackground()
+        // the offline-model server releases its model when the app leaves the foreground
+        Graph.runtime.stopLlama()
+    }
 
     override fun onResume() {
         super.onResume()

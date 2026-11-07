@@ -31,6 +31,7 @@ sealed interface Route {
     data object ConfigEditor : Route
     data object About : Route
     data object Capabilities : Route
+    data object OfflineModels : Route
     data object OcSettings : Route
     data object Appearance : Route
     data object PhoneTools : Route
@@ -95,6 +96,7 @@ object NavMemory {
         Route.ConfigEditor,
         Route.About,
         Route.Capabilities,
+        Route.OfflineModels,
         Route.OcSettings,
         Route.Appearance,
         Route.PhoneTools,

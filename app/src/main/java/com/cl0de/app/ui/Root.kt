@@ -215,6 +215,7 @@ private fun Shell(rt: RuntimeState) {
                         Route.ConfigEditor -> ConfigEditorScreen(nav)
                         Route.About -> AboutScreen(nav)
                         Route.Capabilities -> CapabilitiesScreen(nav)
+                        Route.OfflineModels -> com.cl0de.app.ui.screens.OfflineModelsScreen(nav)
                         Route.OcSettings -> OcSettingsScreen(nav)
                         Route.Appearance -> AppearanceScreen(nav)
                         Route.PhoneTools -> com.cl0de.app.ui.screens.PhoneToolsScreen(nav)

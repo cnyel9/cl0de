@@ -6,8 +6,10 @@ import android.content.Intent
 import androidx.core.content.ContextCompat
 import com.cl0de.app.api.OpenCodeApi
 import com.cl0de.app.data.Prefs
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -15,6 +17,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.io.File
 import java.net.InetSocketAddress
 import java.net.ServerSocket
@@ -43,6 +47,9 @@ class RuntimeController(
         // judges a server that already answered a health check once.
         const val WATCHDOG_INTERVAL_MS = 20_000L
         const val PORT_FREE_WAIT_MS = 90_000L
+        // The offline-model server: its own port and its own place inside the rootfs.
+        const val LLAMA_PORT = 8081
+        const val LLAMA_DIR = "/opt/llama-b12179"
     }
 
     val state = MutableStateFlow<RuntimeState>(
@@ -371,6 +378,180 @@ class RuntimeController(
     suspend fun installDevTools(onLine: (String) -> Unit): Int {
         val script = "apt-get update && apt-get install -y --no-install-recommends git ripgrep curl ca-certificates openssh-client unzip less nano python3 build-essential"
         return runGuest(listOf("/bin/bash", "-lc", script), onLine = onLine)
+    }
+
+    // ---------- llama-server (offline models) ----------
+    // A sibling supervision next to supervise(): its own process, port, stop flag and
+    // state, so nothing here can disturb the OpenCode server. The same patient rules
+    // apply: no spawn on a busy port, a quiet startup grace with no deadline, and a
+    // watchdog that only judges a server that already answered once.
+
+    val llamaState = MutableStateFlow<LlamaState>(LlamaState.Stopped)
+
+    @Volatile private var llamaProcess: Process? = null
+    @Volatile private var llamaStopRequested = false
+    @Volatile private var llamaWantedModel: String? = null
+    private var llamaJob: Job? = null
+    private val llamaScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val llamaHttp = OkHttpClient.Builder().connectTimeout(3, TimeUnit.SECONDS).build()
+
+    /** 80% of the cores, at least 4, at most 8 (the value the Tahap 0 device test used). */
+    fun llamaThreads(): Int = (Runtime.getRuntime().availableProcessors() * 4 / 5).coerceIn(4, 8)
+
+    private fun llamaLog(s: String) = logLine("[llama] $s")
+
+    /** llama-server answers /health with 503 while the model loads and 200 once it serves. */
+    private fun llamaHealthy(callTimeoutSec: Long): Boolean = try {
+        val c = llamaHttp.newBuilder().callTimeout(callTimeoutSec, TimeUnit.SECONDS).build()
+        c.newCall(Request.Builder().url("http://127.0.0.1:$LLAMA_PORT/health").build()).execute().use { it.isSuccessful }
+    } catch (e: Exception) { false }
+
+    fun startLlama(modelId: String, guestModel: String, guestMmproj: String?) {
+        val cur = llamaState.value
+        if (llamaWantedModel == modelId && (cur is LlamaState.Starting || cur is LlamaState.Running)) return
+        llamaJob?.cancel(); llamaJob = null
+        llamaProcess?.destroy()
+        llamaStopRequested = false
+        llamaWantedModel = modelId
+        llamaState.value = LlamaState.Starting(modelId)
+        llamaJob = llamaScope.launch { superviseLlama(modelId, guestModel, guestMmproj) }
+    }
+
+    fun stopLlama() {
+        llamaStopRequested = true
+        llamaWantedModel = null
+        llamaJob?.cancel(); llamaJob = null
+        llamaProcess?.destroy()
+        if (llamaState.value !is LlamaState.Stopped) llamaState.value = LlamaState.Stopped
+    }
+
+    private suspend fun superviseLlama(modelId: String, guestModel: String, guestMmproj: String?) = withContext(Dispatchers.IO) {
+        // the same gate as the OpenCode supervisor: never race the runtime setup
+        while (isActive && !llamaStopRequested && (installing || !paths.rootfsReady)) {
+            if (state.value is RuntimeState.InstallFailed || (state.value is RuntimeState.NotInstalled && !installing)) {
+                llamaState.value = LlamaState.Failed("runtime not ready")
+                return@withContext
+            }
+            delay(1000)
+        }
+        if (llamaStopRequested || !isActive) return@withContext
+
+        // How ggml finds its CPU backend, in order: the way that already worked on this
+        // device (remembered), otherwise automatic discovery first, then the explicit
+        // armv8.2 variants. The 8.6/9.2 variants are never tried: phones in this class
+        // don't have those instruction sets.
+        val remembered = prefs.llamaBackend
+        val v2 = "$LLAMA_DIR/libggml-cpu-armv8.2_2.so"
+        val v1 = "$LLAMA_DIR/libggml-cpu-armv8.2_1.so"
+        val candidates: List<Pair<String, Map<String, String>>> = when {
+            remembered == "auto" -> listOf("auto" to emptyMap())
+            remembered.isNotBlank() -> listOf(remembered to mapOf("GGML_BACKEND_PATH" to remembered))
+            else -> listOf(
+                "auto" to emptyMap(),
+                v2 to mapOf("GGML_BACKEND_PATH" to v2),
+                v1 to mapOf("GGML_BACKEND_PATH" to v1),
+            )
+        }
+        var failures = 0
+        while (isActive && !llamaStopRequested) {
+            if (!awaitLlamaPortFree()) {
+                if (llamaStopRequested) break
+                failures++
+                llamaLog("port $LLAMA_PORT stayed busy, retrying shortly")
+                delay((1500L * failures).coerceAtMost(30_000))
+                continue
+            }
+            var served = false
+            chain@ for ((label, env) in candidates) {
+                if (llamaStopRequested || !isActive) break@chain
+                llamaState.value = LlamaState.Starting(modelId)
+                val argv = buildList {
+                    add("$LLAMA_DIR/llama-server")
+                    add("--host"); add("127.0.0.1"); add("--port"); add(LLAMA_PORT.toString())
+                    add("-m"); add(guestModel)
+                    add("-c"); add("4096")
+                    add("-t"); add(llamaThreads().toString())
+                    if (guestMmproj != null) { add("--mmproj"); add(guestMmproj) }
+                }
+                val pb = ProcessBuilder(proot.build(argv, cwd = "/root", extraEnv = env)).redirectErrorStream(true)
+                pb.environment().putAll(proot.env())
+                val spawnedAt = System.currentTimeMillis()
+                val p = try { pb.start() } catch (e: Exception) {
+                    llamaLog("could not start proot: ${e.message}")
+                    break@chain
+                }
+                llamaProcess = p
+                llamaLog("server process started for $modelId (backend: ${if (label == "auto") "automatic discovery" else label}), waiting for it to answer…")
+                val recent = java.util.Collections.synchronizedList(mutableListOf<String>())
+                val reader = launch { runCatching { p.inputStream.bufferedReader().forEachLine { l -> recent.add(l); if (recent.size > 200) recent.removeAt(0); llamaLog(l) } } }
+                var healthy = false
+                var dog: Job? = null
+                try {
+                    while (isActive && !llamaStopRequested && p.isAlive && !healthy) {
+                        healthy = llamaHealthy(2)
+                        if (!healthy) delay(1000)
+                    }
+                    if (healthy) {
+                        served = true
+                        prefs.llamaBackend = label
+                        llamaState.value = LlamaState.Running(modelId)
+                        failures = 0
+                        llamaLog("server is up: $modelId on port $LLAMA_PORT (took ${(System.currentTimeMillis() - spawnedAt) / 1000}s, backend: ${if (label == "auto") "automatic discovery" else label})")
+                        dog = launch {
+                            var bad = 0
+                            while (isActive && !llamaStopRequested && p.isAlive) {
+                                delay(WATCHDOG_INTERVAL_MS)
+                                if (llamaHealthy(15)) bad = 0 else {
+                                    bad++
+                                    llamaLog("watchdog: health check failed ($bad/3)")
+                                    if (bad >= 3) { llamaLog("watchdog: server stopped answering, restarting it"); p.destroy(); break }
+                                }
+                            }
+                        }
+                        runInterruptible { p.waitFor() }
+                    }
+                } finally {
+                    dog?.cancel()
+                    p.destroy()
+                    if (p.isAlive) { runCatching { p.waitFor(3, TimeUnit.SECONDS) }; if (p.isAlive) p.destroyForcibly() }
+                    if (llamaProcess == p) llamaProcess = null
+                    reader.cancel()
+                }
+                if (llamaStopRequested || !isActive) break@chain
+                if (served) break@chain // it ran and ended: the outer loop restarts it whole
+                val noBackend = synchronized(recent) { recent.any { it.contains("no backends are loaded") } }
+                if (noBackend && label != candidates.last().first) {
+                    llamaLog("ggml found no CPU backend via ${if (label == "auto") "automatic discovery" else label}, trying the next way")
+                    continue@chain
+                }
+                if (noBackend) llamaState.value = LlamaState.Failed("no backends are loaded")
+                break@chain
+            }
+            if (llamaStopRequested || !isActive) break
+            if (llamaState.value is LlamaState.Failed) break
+            failures++
+            val restartIn = (1500L * failures).coerceAtMost(30_000)
+            llamaLog("server exited, restarting in ${restartIn / 1000}s")
+            llamaState.value = LlamaState.Starting(modelId)
+            delay(restartIn)
+        }
+        if (llamaState.value !is LlamaState.Failed) llamaState.value = LlamaState.Stopped
+    }
+
+    /** The llama twin of awaitPortFree, watching the llama stop flag instead. */
+    private suspend fun awaitLlamaPortFree(): Boolean {
+        fun free(): Boolean = try {
+            ServerSocket().apply { reuseAddress = true; bind(InetSocketAddress("127.0.0.1", LLAMA_PORT)); close() }
+            true
+        } catch (e: Exception) { false }
+        if (free()) return true
+        llamaLog("port $LLAMA_PORT is still held by the previous server, waiting for it to free up")
+        val deadline = System.currentTimeMillis() + PORT_FREE_WAIT_MS
+        while (!llamaStopRequested && System.currentTimeMillis() < deadline) {
+            delay(1000)
+            if (free()) { llamaLog("port $LLAMA_PORT is free again"); return true }
+        }
+        return !llamaStopRequested && free()
     }
 
     fun resetRuntime() {

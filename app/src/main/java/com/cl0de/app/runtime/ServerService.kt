@@ -68,6 +68,7 @@ class ServerService : Service() {
 
     override fun onDestroy() {
         Graph.runtime.requestStop()
+        Graph.runtime.stopLlama()
         scope.cancel()
         wake?.let { if (it.isHeld) it.release() }
         super.onDestroy()

@@ -29,6 +29,7 @@ import com.cl0de.app.data.SMisc
 import com.cl0de.app.api.NamedItem
 import com.cl0de.app.api.str
 import com.cl0de.app.ui.Nav
+import com.cl0de.app.ui.Route
 import com.cl0de.app.ui.components.ChoiceRow
 import com.cl0de.app.ui.components.Chip
 import com.cl0de.app.ui.components.IconBtn
@@ -70,7 +71,7 @@ fun ModelsScreen(nav: Nav) {
             }
         }
     }
-    if (pickMain) ModelSheet { pickMain = false }
+    if (pickMain) ModelSheet(onDismiss = { pickMain = false }, onOfflineModels = { pickMain = false; nav.push(Route.OfflineModels) })
     if (pickSmall) OcSheet({ pickSmall = false }, SMisc.smallModel, skipHalf = false) {
         LazyColumn(Modifier.padding(bottom = 24.dp)) {
             item { ChoiceRow(SMisc.autoLabel, cfg.str("small_model") == null, { pickSmall = false }, subtitle = SMisc.letOpenCodeChoose) }
