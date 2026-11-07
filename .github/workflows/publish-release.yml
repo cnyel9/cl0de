@@ -1,0 +1,30 @@
+name: Publish Release Asset
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download verified build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: cl0de-release
+          run-id: 42266102995
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: dl
+      - name: Upload APK to release v0.0.1-release-1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ls -la dl
+          APK=$(find dl -name "*.apk" | head -1)
+          echo "found: $APK"
+          cp "$APK" Cl0de-0.0.1-release-1.apk
+          ls -la Cl0de-0.0.1-release-1.apk
+          gh release upload v0.0.1-release-1 Cl0de-0.0.1-release-1.apk --repo cnyel9/cl0de --clobber
