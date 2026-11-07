@@ -173,7 +173,8 @@ private fun ModelCard(m: OfflineModel, ramBytes: Long, llama: LlamaState, tick: 
                 Spacer(Modifier.weight(1f))
                 when {
                     downloaded -> Chip(if (isActive) SOffline.activeLabel else SOffline.ready)
-                    dl != null && !dl.failed -> Unit // progress replaces the icon while downloading
+                    dl != null -> Unit // downloading shows progress below; a failed state shows its own retry button below
+                    partial > 0L -> Unit // the resume button below is this entry's single download trigger
                     !ramOk -> Unit
                     else -> IconBtn(Ic.Download, { OfflineModels.downloadModel(m) }, size = 40.dp, iconSize = 22.dp)
                 }

@@ -148,8 +148,15 @@ object OfflineModels {
                 catalogTick++
                 syncProvider()
             } else {
-                // the downloader already removed the partial files; show a failed state, not a stuck one
-                dlStates[m.id] = DlState(0f, 0f, m.totalBytes, failed = true)
+                // total failure deletes EVERY file of the model, not just the partial
+                // one: a companion file that already finished (the main file of a
+                // vision model, gigabytes) must not survive either, so the next try
+                // starts from a clean zero
+                m.files.forEach { f ->
+                    hostFile(f).delete()
+                    File(modelsDir(), f.filename + ".part").delete()
+                }
+                dlStates[m.id] = DlState(0f, 0L, m.totalBytes, failed = true)
                 catalogTick++
             }
         }

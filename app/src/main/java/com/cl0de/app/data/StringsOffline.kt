@@ -21,6 +21,8 @@ object SOffline {
     fun serverStarting(name: String) = AppLang.s("Sedang menyalakan $name…", "Starting $name…")
     fun serverRunning(name: String) = AppLang.s("Berjalan · $name", "Running · $name")
     fun serverFailed(msg: String) = AppLang.s("Gagal menyala · $msg", "Failed to start · $msg")
+    val failRuntimeNotReady get() = AppLang.s("runtime belum siap", "runtime not ready")
+    val failNoBackend get() = AppLang.s("tidak ada backend yang termuat", "no backends are loaded")
     val stopServer get() = AppLang.s("Matikan server lokal", "Stop local server")
     val activeLabel get() = AppLang.s("Aktif", "Active")
 

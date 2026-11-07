@@ -1,5 +1,6 @@
 package com.cl0de.app.runtime
 
+import com.cl0de.app.data.SOffline
 import com.cl0de.app.data.Vault
 import android.app.Application
 import android.content.Intent
@@ -17,6 +18,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
@@ -429,29 +431,30 @@ class RuntimeController(
         // the same gate as the OpenCode supervisor: never race the runtime setup
         while (isActive && !llamaStopRequested && (installing || !paths.rootfsReady)) {
             if (state.value is RuntimeState.InstallFailed || (state.value is RuntimeState.NotInstalled && !installing)) {
-                llamaState.value = LlamaState.Failed("runtime not ready")
+                llamaState.value = LlamaState.Failed(SOffline.failRuntimeNotReady)
                 return@withContext
             }
             delay(1000)
         }
         if (llamaStopRequested || !isActive) return@withContext
 
-        // How ggml finds its CPU backend, in order: the way that already worked on this
-        // device (remembered), otherwise automatic discovery first, then the explicit
-        // armv8.2 variants. The 8.6/9.2 variants are never tried: phones in this class
-        // don't have those instruction sets.
-        val remembered = prefs.llamaBackend
+        // How ggml finds its CPU backend: automatic discovery first, then the explicit
+        // armv8.2 variants. The way that already worked on this device (remembered) is
+        // tried first, but the chain is always complete: a remembered way that starts
+        // failing falls through to the others, it never narrows the chain to itself.
+        // The 8.6/9.2 variants are never tried: phones in this class don't have those
+        // instruction sets.
         val v2 = "$LLAMA_DIR/libggml-cpu-armv8.2_2.so"
         val v1 = "$LLAMA_DIR/libggml-cpu-armv8.2_1.so"
-        val candidates: List<Pair<String, Map<String, String>>> = when {
-            remembered == "auto" -> listOf("auto" to emptyMap())
-            remembered.isNotBlank() -> listOf(remembered to mapOf("GGML_BACKEND_PATH" to remembered))
-            else -> listOf(
-                "auto" to emptyMap(),
-                v2 to mapOf("GGML_BACKEND_PATH" to v2),
-                v1 to mapOf("GGML_BACKEND_PATH" to v1),
-            )
-        }
+        val fullChain: List<Pair<String, Map<String, String>>> = listOf(
+            "auto" to emptyMap(),
+            v2 to mapOf("GGML_BACKEND_PATH" to v2),
+            v1 to mapOf("GGML_BACKEND_PATH" to v1),
+        )
+        val remembered = prefs.llamaBackend
+        val candidates: List<Pair<String, Map<String, String>>> =
+            if (remembered.isBlank() || remembered == "auto") fullChain
+            else fullChain.filter { it.first == remembered } + fullChain.filter { it.first != remembered }
         var failures = 0
         while (isActive && !llamaStopRequested) {
             if (!awaitLlamaPortFree()) {
@@ -515,23 +518,35 @@ class RuntimeController(
                     p.destroy()
                     if (p.isAlive) { runCatching { p.waitFor(3, TimeUnit.SECONDS) }; if (p.isAlive) p.destroyForcibly() }
                     if (llamaProcess == p) llamaProcess = null
+                    // drain the reader to EOF before the buffer is inspected below: a
+                    // process that dies fast can otherwise lose its last lines, and with
+                    // them the "no backends are loaded" that moves the chain along
+                    withTimeoutOrNull(2_000) { reader.join() }
                     reader.cancel()
                 }
                 if (llamaStopRequested || !isActive) break@chain
+                val exitCode = runCatching { p.exitValue() }.getOrDefault(-1)
+                llamaLog(
+                    "server exited (code $exitCode) after ${(System.currentTimeMillis() - spawnedAt) / 1000}s" +
+                        (if (!healthy) ", before it ever answered a health check" else "")
+                )
                 if (served) break@chain // it ran and ended: the outer loop restarts it whole
                 val noBackend = synchronized(recent) { recent.any { it.contains("no backends are loaded") } }
                 if (noBackend && label != candidates.last().first) {
                     llamaLog("ggml found no CPU backend via ${if (label == "auto") "automatic discovery" else label}, trying the next way")
                     continue@chain
                 }
-                if (noBackend) llamaState.value = LlamaState.Failed("no backends are loaded")
+                if (noBackend) {
+                    llamaLog("no CPU backend could be loaded by any of the ${candidates.size} ways, giving up")
+                    llamaState.value = LlamaState.Failed(SOffline.failNoBackend)
+                }
                 break@chain
             }
             if (llamaStopRequested || !isActive) break
             if (llamaState.value is LlamaState.Failed) break
             failures++
             val restartIn = (1500L * failures).coerceAtMost(30_000)
-            llamaLog("server exited, restarting in ${restartIn / 1000}s")
+            llamaLog("restarting in ${restartIn / 1000}s")
             llamaState.value = LlamaState.Starting(modelId)
             delay(restartIn)
         }

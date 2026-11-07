@@ -99,6 +99,8 @@ object FreeModels {
         runCatching { Graph.api.disposeAll() }
         runCatching { Graph.catalog.refresh() }
         Graph.prefs.providerId = providerId; Graph.prefs.modelId = modelId; Graph.prefs.variant = ""
+        // activating a free cloud model releases the offline model's RAM right away
+        if (providerId != OfflineModels.ID) Graph.runtime.stopLlama()
         Vault.save()
     }
 }
