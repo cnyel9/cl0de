@@ -146,6 +146,41 @@ fun VoiceMode(sessionId: String?, onClose: (String?) -> Unit) {
         }
     }
 
+    fun startOfflineListen() {
+        talk = Talk.Listening; caption = ""
+        synchronized(offlineChunks) { offlineChunks.clear() }
+        offlineRec.start(
+            onChunk = { s -> synchronized(offlineChunks) { offlineChunks.add(s) } },
+            onLevel = { level = it },
+        )
+    }
+
+    /** Ring tap while listening offline: stop recording, transcribe, then treat it like a heard phrase. */
+    fun stopOfflineListen() {
+        offlineRec.stop()
+        level = 0f
+        val all = synchronized(offlineChunks) {
+            val out = FloatArray(offlineChunks.sumOf { it.size }.coerceAtMost(16000 * 120))
+            var pos = 0
+            for (ch in offlineChunks) {
+                val n = minOf(ch.size, out.size - pos)
+                if (n <= 0) break
+                ch.copyInto(out, pos, 0, n)
+                pos += n
+            }
+            offlineChunks.clear()
+            out
+        }
+        if (all.isEmpty()) { talk = Talk.Idle; return }
+        caption = SVoice.transcribing
+        scope.launch {
+            val text = runCatching {
+                withContext(Dispatchers.Default) { com.cl0de.app.data.OfflineSpeech.transcribe(ctx, all, com.cl0de.app.data.OfflineSpeech.whisperLang()) }
+            }.getOrDefault("")
+            if (text.isBlank()) { caption = ""; startOfflineListen() } else ask(text)
+        }
+    }
+
     fun listen() {
         if (!granted) { perm.launch(Manifest.permission.RECORD_AUDIO); return }
         if (muted) { talk = Talk.Idle; return }
@@ -179,41 +214,6 @@ fun VoiceMode(sessionId: String?, onClose: (String?) -> Unit) {
             override fun onEvent(eventType: Int, params: Bundle?) {}
         })
         r.startListening(com.cl0de.app.data.Speech.recognizerIntent())
-    }
-
-    fun startOfflineListen() {
-        talk = Talk.Listening; caption = ""
-        synchronized(offlineChunks) { offlineChunks.clear() }
-        offlineRec.start(
-            onChunk = { s -> synchronized(offlineChunks) { offlineChunks.add(s) } },
-            onLevel = { level = it },
-        )
-    }
-
-    /** Ring tap while listening offline: stop recording, transcribe, then treat it like a heard phrase. */
-    fun stopOfflineListen() {
-        offlineRec.stop()
-        level = 0f
-        val all = synchronized(offlineChunks) {
-            val out = FloatArray(offlineChunks.sumOf { it.size }.coerceAtMost(16000 * 120))
-            var pos = 0
-            for (ch in offlineChunks) {
-                val n = minOf(ch.size, out.size - pos)
-                if (n <= 0) break
-                ch.copyInto(out, pos, 0, n)
-                pos += n
-            }
-            offlineChunks.clear()
-            out
-        }
-        if (all.isEmpty()) { talk = Talk.Idle; return }
-        caption = SVoice.transcribing
-        scope.launch {
-            val text = runCatching {
-                withContext(Dispatchers.Default) { com.cl0de.app.data.OfflineSpeech.transcribe(ctx, all, com.cl0de.app.data.OfflineSpeech.whisperLang()) }
-            }.getOrDefault("")
-            if (text.isBlank()) { caption = ""; listen() } else ask(text)
-        }
     }
 
     listenNext = { listen() }
