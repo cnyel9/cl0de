@@ -253,7 +253,7 @@ fun ConfigEditorScreen(nav: Nav) {
             importing = true; importMsg = null
             runCatching { com.cl0de.app.data.ConfigImport.import(importCtx, uri) }
                 .onSuccess { r ->
-                    importMsg = SSet.importedCounts(r.providers, r.models)
+                    importMsg = SSet.importedCounts(r.providers, r.models) + " " + SSet.listReloaded
                     load()
                 }
                 .onFailure { importMsg = it.message ?: SSet.importFailed }
@@ -270,9 +270,18 @@ fun ConfigEditorScreen(nav: Nav) {
             Pill(S.save, {
                 val o = runCatching { OcJson.parseToJsonElement(text) as JsonObject }.getOrNull()
                 if (o == null) msg = SSet.notValidJson
-                else scope.launch { msg = runCatching { Graph.api.patchGlobalConfig(o); SSet.saved }.getOrElse { it.message } }
+                else scope.launch {
+                    msg = runCatching {
+                        Graph.api.patchGlobalConfig(o)
+                        // Same reload the FreeModels flow applies after it changes the
+                        // global config, so new providers/models show up at once.
+                        runCatching { Graph.api.disposeAll() }
+                        runCatching { Graph.catalog.refresh() }
+                        SSet.savedModelsReloaded
+                    }.getOrElse { it.message }
+                }
             }, modifier = Modifier.fillMaxWidth())
-            msg?.let { Txt(it, size = 15.sp, color = if (it == SSet.saved) c.ok else c.danger, modifier = Modifier.padding(top = 12.dp)) }
+            msg?.let { Txt(it, size = 15.sp, color = if (it == SSet.saved || it == SSet.savedModelsReloaded) c.ok else c.danger, modifier = Modifier.padding(top = 12.dp)) }
             Spacer(Modifier.height(26.dp))
             Txt(SSet.importFromOldApp, size = 16.sp, weight = androidx.compose.ui.text.font.FontWeight.SemiBold, modifier = Modifier.padding(bottom = 6.dp))
             Txt(
