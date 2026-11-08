@@ -285,7 +285,16 @@ class ChatHub(private val api: OpenCodeApi, private val events: EventHub, privat
             // in the Cl0de look the agent is the Cl0de cloud (Persona), unless turned off
             // anonymous chat: tell the agent not to remember anything from it
             val anon = if (isIncognito(sessionId)) "This is an anonymous chat. Do not save anything from it to memory, notes or files outside the task." else null
-            api.promptAsync(sessionId, dir, parts, providerSnap, modelSnap, prefs.agent, variantSnap, listOfNotNull(Persona.instruction(), team, anon).joinToString("\n\n").ifBlank { null })
+            // Deep only: a compact memory block (profile rules + memory facts)
+            // that the bridge lifts next to the agent prompt before its
+            // 4000-char trim. A transient promptAsync argument only, never
+            // written to config or AGENTS.md. Anonymous sessions get nothing
+            // (private facts do not belong there) and neither do remote
+            // devices, where this provider's bridge does not exist.
+            val deepMemory = if (providerSnap == DeepModels.ID && !isIncognito(sessionId) && !Graph.devices.isRemote) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { DeepModels.memorySummaryBlock() }.getOrNull() }
+            } else null
+            api.promptAsync(sessionId, dir, parts, providerSnap, modelSnap, prefs.agent, variantSnap, listOfNotNull(Persona.instruction(), team, anon, deepMemory).joinToString("\n\n").ifBlank { null })
         } catch (e: Exception) {
             localId?.let { chat(sessionId).dropLocal(it) }
             throw e

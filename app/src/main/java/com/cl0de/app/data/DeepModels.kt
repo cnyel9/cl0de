@@ -157,6 +157,45 @@ object DeepModels {
         synced = true
     }
 
+    // ---------- Deep memory summary (send-time payload, never stored) ----------
+
+    private const val MEMORY_BUDGET = 1500
+    private const val MEMORY_START = "<!-- cl0de-deep-memory:start -->"
+    private const val MEMORY_END = "<!-- cl0de-deep-memory:end -->"
+
+    /**
+     * A compact memory block for Deep chats: the user's own rules first,
+     * then memory facts line by line across the shelves, cut at line
+     * boundaries inside a ~1500-char budget (roughly 15-20 facts). ChatHub
+     * adds it to the per-request system only for this provider and the
+     * bridge lifts it next to the agent prompt, because the merged system
+     * is trimmed to 4000 chars for DeepChat and the full memory snapshot
+     * would otherwise fall off the tail. Facts ride only when memory is
+     * enabled; the rules are the profile preferences and always count.
+     * Null when there is nothing to say.
+     */
+    fun memorySummaryBlock(): String? {
+        val rules = runCatching { Memory.userRules() }.getOrDefault("").trim()
+        val facts = if (Graph.prefs.memoryEnabled) {
+            runCatching { Memory.shelves().flatMap { Memory.facts(it) } }.getOrDefault(emptyList())
+        } else emptyList()
+        if (rules.isEmpty() && facts.isEmpty()) return null
+        val body = buildString {
+            append("Memori pengguna (ringkas):")
+            for (line in rules.lines()) {
+                val add = "\n" + line
+                if (length + add.length > MEMORY_BUDGET) break
+                append(add)
+            }
+            for (fact in facts) {
+                val add = "\n- " + fact.trim()
+                if (length + add.length > MEMORY_BUDGET) break
+                append(add)
+            }
+        }
+        return "$MEMORY_START\n$body\n$MEMORY_END"
+    }
+
     /** Providers screen disconnect: drop the provider via the disabled list (deep merge never removes keys), with the full reload pattern. */
     suspend fun disable() {
         Graph.prefs.deepDisabled = true
