@@ -25,6 +25,9 @@ const PORT = 8181;
 const SERVICE = 'cl0de-deep-bridge';
 const CHAT_TIMEOUT_MS = 120_000;
 const MAX_BODY_BYTES = 32 * 1024 * 1024;
+// DeepChat rejects a systemPrompt longer than this with HTTP 400
+// ("systemPrompt exceeds maximum length of 4000 characters").
+const SYSTEM_PROMPT_MAX_CHARS = 4000;
 
 // Static catalog snapshot from the module's own getConfig() (8 Nov 2026),
 // filtered to capabilities.text_chat == true && enabled == true. A background
@@ -189,11 +192,19 @@ async function handleChat(req, res) {
 
   // system turns merge into the module's single systemPrompt; only system,
   // user and assistant have a mapping, every other role is dropped.
-  const systemPrompt = messages
+  const mergedSystem = messages
     .filter((m) => m && m.role === 'system')
     .map((m) => textOf(m.content))
     .filter(Boolean)
     .join('\n\n');
+  // The merged text is capped at the upstream limit, keeping the front: the
+  // agent prompt comes first, environment context and AGENTS.md follow and
+  // are what gets cut. This also covers a single oversized system turn.
+  let systemPrompt = mergedSystem;
+  if (systemPrompt.length > SYSTEM_PROMPT_MAX_CHARS) {
+    console.log(`systemPrompt trimmed: ${systemPrompt.length} -> ${SYSTEM_PROMPT_MAX_CHARS} chars`);
+    systemPrompt = systemPrompt.slice(0, SYSTEM_PROMPT_MAX_CHARS);
+  }
 
   let lastUser = -1;
   for (let i = messages.length - 1; i >= 0; i--) {
