@@ -19,7 +19,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -184,6 +186,8 @@ fun ServerScreen(nav: Nav) {
                 })
             }
             Spacer(Modifier.height(16.dp))
+            ServerRecoveryCard()
+            Spacer(Modifier.height(16.dp))
             SettingsGroup {
                 SettingsRow(SSet.updateOpenCode, subtitle = updating ?: SSet.installedVersion(prefs.opencodeVersion.ifBlank { "?" }), icon = Ic.Download, onClick = {
                     if (updating == null) { updating = SSet.checking; scope.launch {
@@ -216,6 +220,52 @@ fun ServerScreen(nav: Nav) {
     if (reset) OcDialog(SSet.resetEnvironmentQuestion, { reset = false }, SSet.reset, {
         reset = false; Graph.runtime.resetRuntime()
     }, danger = true) { Txt(SSet.resetBody, size = 16.sp, color = Oc.c.textDim) }
+}
+
+/**
+ * Recovery flow for a server that crashed or will not start, right under the
+ * server settings group: the field fix as five numbered steps (stop the
+ * server, App info, clear cache, force stop, start again), plus a shortcut
+ * button that opens this app's App info page directly.
+ */
+@Composable
+private fun ServerRecoveryCard() {
+    val c = Oc.c
+    val ctx = LocalContext.current
+    val steps = listOf(
+        SSet.recoveryStepStopServer,
+        SSet.recoveryStepAppInfo,
+        SSet.recoveryStepClearCache,
+        SSet.recoveryStepForceStop,
+        SSet.recoveryStepRestartServer,
+    )
+    Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(Oc.round(24.dp)).background(c.surface).padding(20.dp)) {
+        Txt(SSet.serverRecoveryTitle, size = 17.sp, weight = androidx.compose.ui.text.font.FontWeight.Medium)
+        Txt(SSet.serverRecoveryIntro, size = 14.sp, color = c.textDim, modifier = Modifier.padding(top = 4.dp))
+        Spacer(Modifier.height(14.dp))
+        steps.forEachIndexed { i, label ->
+            Row {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        Modifier.size(24.dp).clip(CircleShape).background(c.surfaceHigh),
+                        contentAlignment = Alignment.Center,
+                    ) { Txt((i + 1).toString(), size = 12.sp, weight = androidx.compose.ui.text.font.FontWeight.Medium) }
+                    if (i < steps.lastIndex) Box(Modifier.width(2.dp).height(16.dp).background(c.border))
+                }
+                Spacer(Modifier.width(12.dp))
+                Txt(label, size = 15.sp, modifier = Modifier.padding(top = 2.dp))
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+        SmallButton(SSet.openAppInfo, {
+            val appInfo = Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:${ctx.packageName}"),
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            runCatching { ctx.startActivity(appInfo) }
+                .onFailure { Graph.chats.toasts.tryEmit(SSet.appInfoUnavailable) }
+        }, filled = true)
+    }
 }
 
 @Composable
