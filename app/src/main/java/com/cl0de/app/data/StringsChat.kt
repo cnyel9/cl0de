@@ -110,6 +110,8 @@ object SChat {
     val friend get() = AppLang.s("teman", "friend")
 
     // ---------- chat screen ----------
+    /** The thin info strip shown in chat while a Deep model is active. */
+    val deepChatOnly get() = AppLang.s("Model Deep hanya untuk chat sehari hari, bukan agen: tidak bisa menjalankan alat.", "Deep models are for everyday chat only, not an agent: they can't run tools.")
     val retryFailed get() = AppLang.s("Coba lagi gagal", "Retry failed")
     fun fileNotFound(uri: String) = AppLang.s("File tidak ditemukan: $uri", "File not found: $uri")
     val pin get() = AppLang.s("Sematkan", "Pin")

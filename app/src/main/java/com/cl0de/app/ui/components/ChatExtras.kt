@@ -17,7 +17,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,6 +68,31 @@ fun InterruptedCard(id: String) {
             SmallButton(S.cancel, { Graph.chats.dismissInterrupted(id) })
             SmallButton(SChat.continueAction, { scope.launch { runCatching { Graph.chats.resumeInterrupted(ctx, id) }.onFailure { Graph.chats.toasts.tryEmit(it.message ?: SChat.couldNotContinue) } } }, filled = true)
         }
+    }
+}
+
+/**
+ * The Deep info strip in chat: while a Deep model is selected, a thin pill
+ * (AccessBanner's shape) states that Deep is everyday chat, not an agent. It
+ * hides itself for any other provider. Dismissal is remembered per provider
+ * only (not per model, and deliberately NOT persisted like the access
+ * banner's): closing it silences it for every Deep model until the selection
+ * leaves the Deep provider and comes back, or the app process restarts.
+ */
+@Composable
+fun DeepInfoBanner() {
+    val c = Oc.c
+    val prefs = Graph.prefs
+    var dismissed by remember(prefs.providerId) { mutableStateOf(false) }
+    if (prefs.providerId != com.cl0de.app.data.DeepModels.ID || dismissed) return
+    Row(
+        Modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth().clip(CircleShape).background(c.surface).border(1.dp, c.border, CircleShape)
+            .padding(start = 16.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Ico(Ic.Chat, tint = c.textDim, size = 17.dp); Spacer(Modifier.width(10.dp))
+        Txt(SChat.deepChatOnly, Modifier.weight(1f), size = 14.sp, maxLines = 2)
+        IconBtn(Ic.Close, { dismissed = true }, tint = c.textDim, size = 38.dp, iconSize = 18.dp)
     }
 }
 

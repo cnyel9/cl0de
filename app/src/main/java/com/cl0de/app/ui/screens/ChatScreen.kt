@@ -276,6 +276,10 @@ fun ChatScreen(id: String, nav: Nav, onMenu: () -> Unit) {
         com.cl0de.app.ui.components.InterruptedCard(id)
         if (myQuestion == null && myPerm == null) com.cl0de.app.ui.components.PreviewChips(chat, id, nav)
         if (myQuestion == null && myPerm == null) com.cl0de.app.ui.components.TeamStrip(id, nav)
+        // the Deep info strip is not gated by a pending question/permission: it
+        // stays visible above those panels and the composer (it hides itself
+        // for non-Deep models)
+        com.cl0de.app.ui.components.DeepInfoBanner()
         if (myQuestion != null || myPerm != null) Box(Modifier.navigationBarsPadding().padding(bottom = 8.dp)) {
             androidx.compose.animation.AnimatedContent(myQuestion?.id ?: myPerm?.id, label = "ask", transitionSpec = {
                 (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(140)) + androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(160)) { it / 4 }) togetherWith
