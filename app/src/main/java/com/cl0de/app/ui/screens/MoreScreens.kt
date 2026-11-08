@@ -8,6 +8,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,6 +52,7 @@ import com.cl0de.app.api.str
 import com.cl0de.app.runtime.RuntimeState
 import com.cl0de.app.ui.Nav
 import com.cl0de.app.ui.components.Chip
+import com.cl0de.app.ui.components.Ico
 import com.cl0de.app.ui.components.IconBtn
 import com.cl0de.app.ui.components.OcDialog
 import com.cl0de.app.ui.components.OcSheet
@@ -354,6 +357,24 @@ fun ProfileScreen(nav: Nav) {
     var name by remember { mutableStateOf(prefs.userName) }
     var rules by remember { mutableStateOf(com.cl0de.app.data.Memory.userRules()) }
     var saved by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    // Long rules start folded (a preview plus an Edit row) so the editor does
+    // not push the whole screen down; short rules, the common case today,
+    // start open with no fold row at all. While folded, Save is withheld:
+    // nobody saves what they cannot see in full.
+    val startsFolded = remember { rules.count { it == '\n' } + 1 > 6 || rules.length > 500 }
+    var expanded by remember { mutableStateOf(!startsFolded) }
+    var importingRules by remember { mutableStateOf(false) }
+    var rulesImportMsg by remember { mutableStateOf<String?>(null) }
+    val rulesImporter = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            importingRules = true; rulesImportMsg = null
+            runCatching { com.cl0de.app.data.Memory.importRules(ctx, uri) }
+                .onSuccess { imported -> rules = imported; saved = false; expanded = true; rulesImportMsg = SSet.importedToEditor }
+                .onFailure { rulesImportMsg = it.message ?: SSet.importFailed }
+            importingRules = false
+        }
+    }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) runCatching {
             val bytes = ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
@@ -379,10 +400,38 @@ fun ProfileScreen(nav: Nav) {
                 Spacer(Modifier.height(10.dp))
                 Txt(SSet.personalPreferencesQuestion, size = 19.sp, modifier = Modifier.padding(start = 4.dp))
                 Txt(SSet.savedAsAgentsMd, size = 14.sp, color = c.textDim, modifier = Modifier.padding(start = 4.dp))
-                OcTextField(rules, { rules = it; saved = false }, singleLine = false, minLines = 6, placeholder = SSet.profileRulesPlaceholder)
-                Pill(if (saved) SSet.saved else SSet.savePreferences, {
-                    runCatching { com.cl0de.app.data.Memory.saveUserRules(rules) }.onSuccess { saved = true }
-                }, enabled = !saved, modifier = Modifier.fillMaxWidth())
+                if (startsFolded) {
+                    Row(Modifier.fillMaxWidth().clip(Oc.round(10.dp)).clickable { expanded = !expanded }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Txt(if (expanded) SSet.collapsePreferences else SSet.editPreferences, size = 15.sp, color = c.textDim)
+                        Spacer(Modifier.width(4.dp))
+                        Ico(if (expanded) Ic.ChevronDown else Ic.ChevronRight, tint = c.textDim, size = 16.dp)
+                    }
+                    androidx.compose.animation.AnimatedVisibility(
+                        expanded,
+                        enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(120)) + androidx.compose.animation.expandVertically(androidx.compose.animation.core.tween(180)),
+                        exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(80)) + androidx.compose.animation.shrinkVertically(androidx.compose.animation.core.tween(150)),
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            OcTextField(rules, { rules = it; saved = false }, singleLine = false, minLines = 6, placeholder = SSet.profileRulesPlaceholder)
+                            Pill(if (saved) SSet.saved else SSet.savePreferences, {
+                                runCatching { com.cl0de.app.data.Memory.saveUserRules(rules) }.onSuccess { saved = true }
+                            }, enabled = !saved, modifier = Modifier.fillMaxWidth())
+                        }
+                    }
+                    if (!expanded) {
+                        Box(Modifier.fillMaxWidth().clip(Oc.round(20.dp)).background(c.surface).border(1.dp, c.border, Oc.round(20.dp)).padding(horizontal = 20.dp, vertical = 16.dp)) {
+                            Txt(rules.ifBlank { SSet.profileRulesPlaceholder }, size = 17.sp, color = c.textDim, maxLines = 4)
+                        }
+                    }
+                } else {
+                    OcTextField(rules, { rules = it; saved = false }, singleLine = false, minLines = 6, placeholder = SSet.profileRulesPlaceholder)
+                    Pill(if (saved) SSet.saved else SSet.savePreferences, {
+                        runCatching { com.cl0de.app.data.Memory.saveUserRules(rules) }.onSuccess { saved = true }
+                    }, enabled = !saved, modifier = Modifier.fillMaxWidth())
+                }
+                Txt(SSet.importPreferencesDesc, size = 14.sp, color = c.textDim, modifier = Modifier.padding(start = 4.dp), lineHeight = 20.sp)
+                Pill(if (importingRules) SSet.importing else SSet.importPreferences, { if (!importingRules) rulesImporter.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth())
+                rulesImportMsg?.let { Txt(it, size = 15.sp, color = c.textDim, modifier = Modifier.padding(start = 4.dp)) }
             }
         }
     }

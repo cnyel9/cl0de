@@ -1,7 +1,14 @@
 package com.cl0de.app.data
 
+import android.content.Context
+import android.net.Uri
 import com.cl0de.app.Graph
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.InputStream
+import java.util.zip.ZipInputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Directories for "regular" chats and memory inside the environment (proot). Everything outside CHAT_DIR is the Code tab. */
 const val CHAT_DIR = "/root/chats"
@@ -163,6 +170,77 @@ The user talks to you from a phone app. It cannot see your terminal or your disk
         f.parentFile?.mkdirs()
         f.writeText(text.trim() + "\n")
         sync()
+    }
+
+    // ---------- preferences import (Profile screen) ----------
+
+    private const val IMPORT_MAX_BYTES = 2 * 1024 * 1024
+    private const val IMPORT_ENTRY_MAX_BYTES = 256 * 1024
+    private const val IMPORT_MAX_ENTRIES = 500
+    private const val IMPORT_MAX_CHARS = 100_000
+
+    /**
+     * Reads preferences text from a picked file: a plain .md/.txt, or a .zip
+     * (detected by its PK magic, not its name) where an AGENTS.md entry at
+     * any depth wins and the first .md entry is the fallback. Returns
+     * validated text only; nothing is written here, the caller fills the
+     * editor and the user saves with the usual button. Every guard is an
+     * honest error, never a silent truncation.
+     */
+    suspend fun importRules(ctx: Context, uri: Uri): String = withContext(Dispatchers.IO) {
+        val bytes = ctx.contentResolver.openInputStream(uri)?.use { readBounded(it, IMPORT_MAX_BYTES, "The file is too large (max 2 MB)") }
+            ?: error("Could not read the file")
+        val raw = if (bytes.size > 4 && bytes[0] == 'P'.code.toByte() && bytes[1] == 'K'.code.toByte()) extractFromZip(bytes) else bytes
+        val text = decodeImported(raw)
+        require(text.length <= IMPORT_MAX_CHARS) { "The text is too long (max 100,000 characters)" }
+        require(!text.contains('\u0000')) { "The file looks binary, not text" }
+        val bad = text.count { it == '\uFFFD' }
+        require(text.isEmpty() || bad * 100 <= text.length) { "The file is not readable text" }
+        require(text.isNotBlank()) { "The file is empty" }
+        text.trim()
+    }
+
+    private fun readBounded(input: InputStream, max: Int, tooBig: String): ByteArray {
+        val out = ByteArrayOutputStream()
+        val buf = ByteArray(8192)
+        var total = 0
+        while (true) {
+            val n = input.read(buf)
+            if (n < 0) break
+            total += n
+            require(total <= max) { tooBig }
+            out.write(buf, 0, n)
+        }
+        return out.toByteArray()
+    }
+
+    private fun extractFromZip(bytes: ByteArray): ByteArray {
+        var fallback: ByteArray? = null
+        var count = 0
+        ZipInputStream(bytes.inputStream()).use { z ->
+            while (true) {
+                val e = z.nextEntry ?: break
+                count++
+                require(count <= IMPORT_MAX_ENTRIES) { "The archive has too many entries (max 500)" }
+                if (e.isDirectory) continue
+                val p = e.name.replace('\\', '/').trimStart('/')
+                if (p.split('/').any { it == ".." } || p.startsWith("__MACOSX/")) continue
+                val base = p.substringAfterLast('/')
+                if (base.equals("AGENTS.md", true)) return readBounded(z, IMPORT_ENTRY_MAX_BYTES, "The file inside the archive is too large (max 256 KB)")
+                if (fallback == null && base.endsWith(".md", true)) {
+                    fallback = readBounded(z, IMPORT_ENTRY_MAX_BYTES, "The file inside the archive is too large (max 256 KB)")
+                }
+            }
+        }
+        return fallback ?: error("No AGENTS.md or .md file in the archive")
+    }
+
+    /** UTF-16 when its BOM says so (BOM stripped), otherwise UTF-8 (BOM stripped). */
+    private fun decodeImported(bytes: ByteArray): String = when {
+        bytes.size >= 2 && bytes[0] == 0xFF.toByte() && bytes[1] == 0xFE.toByte() -> String(bytes, 2, bytes.size - 2, Charsets.UTF_16LE)
+        bytes.size >= 2 && bytes[0] == 0xFE.toByte() && bytes[1] == 0xFF.toByte() -> String(bytes, 2, bytes.size - 2, Charsets.UTF_16BE)
+        bytes.size >= 3 && bytes[0] == 0xEF.toByte() && bytes[1] == 0xBB.toByte() && bytes[2] == 0xBF.toByte() -> String(bytes, 3, bytes.size - 3, Charsets.UTF_8)
+        else -> String(bytes, Charsets.UTF_8)
     }
 
     private const val LANG_START = "<!-- cl0de-lang:start -->"

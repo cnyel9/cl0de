@@ -198,6 +198,11 @@ object SSet {
     val savedAsAgentsMd get() = AppLang.s("Tersimpan sebagai AGENTS.md global, berlaku untuk semua proyek.", "Saved as global AGENTS.md — applies to every project.")
     val profileRulesPlaceholder get() = AppLang.s("Jawab dalam Bahasa Indonesia. Utamakan perubahan kecil. Tanya sebelum refactor besar.", "Reply in Russian. Prefer small diffs. Ask before big refactors.")
     val savePreferences get() = AppLang.s("Simpan preferensi", "Save preferences")
+    val editPreferences get() = AppLang.s("Ubah preferensi", "Edit preferences")
+    val collapsePreferences get() = AppLang.s("Ciutkan", "Collapse")
+    val importPreferences get() = AppLang.s("Impor preferensi", "Import preferences")
+    val importPreferencesDesc get() = AppLang.s("Ambil teks preferensi dari berkas .md atau .zip; di dalam zip yang dicari adalah AGENTS.md. Hasilnya mengisi editor dan belum tersimpan.", "Take the preferences text from an .md file or a .zip; inside a zip, AGENTS.md is the one looked for. The result fills the editor and is not saved yet.")
+    val importedToEditor get() = AppLang.s("Isi editor diganti dari berkas impor dan belum tersimpan. Periksa dulu, lalu tekan Simpan preferensi.", "The editor now holds the imported file's contents and is not saved yet. Review it first, then tap Save preferences.")
 
     // About
     val about get() = AppLang.s("Tentang", "About")
