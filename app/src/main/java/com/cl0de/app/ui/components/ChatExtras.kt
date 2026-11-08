@@ -78,6 +78,8 @@ fun InterruptedCard(id: String) {
  * only (not per model, and deliberately NOT persisted like the access
  * banner's): closing it silences it for every Deep model until the selection
  * leaves the Deep provider and comes back, or the app process restarts.
+ * The text is never truncated: it wraps to as many lines as it needs so the
+ * whole notice is always readable.
  */
 @Composable
 fun DeepInfoBanner() {
@@ -91,7 +93,7 @@ fun DeepInfoBanner() {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Ico(Ic.Chat, tint = c.textDim, size = 17.dp); Spacer(Modifier.width(10.dp))
-        Txt(SChat.deepChatOnly, Modifier.weight(1f), size = 14.sp, maxLines = 2)
+        Txt(SChat.deepChatOnly, Modifier.weight(1f), size = 14.sp)
         IconBtn(Ic.Close, { dismissed = true }, tint = c.textDim, size = 38.dp, iconSize = 18.dp)
     }
 }
