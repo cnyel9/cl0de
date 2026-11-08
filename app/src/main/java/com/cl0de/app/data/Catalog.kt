@@ -34,7 +34,7 @@ class Catalog(private val api: OpenCodeApi, private val prefs: Prefs, private va
         ensureSelection()
     }
 
-    private fun rank(id: String) = when (id) { "opencode-go" -> 0; "opencode" -> 1; "anthropic" -> 2; "openai" -> 3; else -> 5 }
+    private fun rank(id: String) = when (id) { "deep" -> 0; "opencode-go" -> 1; "opencode" -> 2; else -> 5 }
 
     fun model(providerId: String, modelId: String): ModelInfo? =
         providers.value.firstOrNull { it.id == providerId }?.models?.get(modelId)

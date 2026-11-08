@@ -475,24 +475,24 @@ fun OcDialog(
     )
 }
 
-/** Picker row in dialogs/sheets: blue highlight and a check on the selected one. */
+/** Picker row in dialogs/sheets: blue highlight and a check on the selected one. Compact is the denser geometry the full model list uses. */
 @Composable
-fun ChoiceRow(label: String, selected: Boolean, onClick: () -> Unit, icon: ImageVector? = null, subtitle: String? = null, badge: String? = null) {
+fun ChoiceRow(label: String, selected: Boolean, onClick: () -> Unit, icon: ImageVector? = null, subtitle: String? = null, badge: String? = null, compact: Boolean = false) {
     val c = Oc.c
     val col = if (selected) c.link else c.text
     Row(
-        Modifier.fillMaxWidth().tap(scale = 1f, onClick = onClick).padding(horizontal = 24.dp, vertical = 15.dp),
+        Modifier.fillMaxWidth().tap(scale = 1f, onClick = onClick).padding(horizontal = if (compact) 16.dp else 24.dp, vertical = if (compact) 8.dp else 15.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (icon != null) { Ico(icon, tint = col, size = 26.dp); Spacer(Modifier.width(20.dp)) }
+        if (icon != null) { Ico(icon, tint = col, size = if (compact) 22.dp else 26.dp); Spacer(Modifier.width(if (compact) 14.dp else 20.dp)) }
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Txt(label, size = 19.sp, color = col)
+                Txt(label, size = if (compact) 16.sp else 19.sp, color = col, maxLines = if (compact) 1 else Int.MAX_VALUE)
                 if (badge != null) { Spacer(Modifier.width(10.dp)); Chip(badge) }
             }
-            if (subtitle != null) Txt(subtitle, size = 14.sp, color = c.textDim, modifier = Modifier.padding(top = 2.dp))
+            if (subtitle != null) Txt(subtitle, size = if (compact) 12.sp else 14.sp, color = c.textDim, maxLines = if (compact) 1 else Int.MAX_VALUE, modifier = Modifier.padding(top = 2.dp))
         }
-        if (selected) Ico(Ic.Check, tint = c.link, size = 24.dp)
+        if (selected) Ico(Ic.Check, tint = c.link, size = if (compact) 20.dp else 24.dp)
     }
 }
 

@@ -113,6 +113,7 @@ fun PickRow(
     trailing: String? = null,
     badge: String? = null,
     chevron: Boolean = false,
+    compact: Boolean = false,
 ) {
     val c = Oc.c
     when {
@@ -152,7 +153,7 @@ fun PickRow(
         else -> {
             if (trailing != null || chevron) {
                 SettingsGroupRow(label, subtitle ?: trailing, icon, chevron, onClick)
-            } else ChoiceRow(label, selected, onClick, icon = icon, subtitle = subtitle, badge = badge)
+            } else ChoiceRow(label, selected, onClick, icon = icon, subtitle = subtitle, badge = badge, compact = compact)
         }
     }
 }

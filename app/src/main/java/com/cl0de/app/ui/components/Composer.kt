@@ -505,7 +505,9 @@ fun ModelSheet(start: String = "main", onDismiss: () -> Unit, onOfflineModels: (
                 PickRow(SChat.effortLabel, { page = "effort" }, trailing = prefs.variant.ifBlank { SChat.defaultLabel }.replaceFirstChar { it.uppercase() }, chevron = true)
             }
             providers.forEach { p ->
-                val ms = p.models.values.filter { query.isBlank() || it.name.contains(query, true) || it.id.contains(query, true) }
+                val q = query.trim()
+                val providerMatch = q.isNotEmpty() && (p.name.contains(q, true) || p.id.contains(q, true))
+                val ms = p.models.values.filter { q.isBlank() || providerMatch || it.name.contains(q, true) || it.id.contains(q, true) }
                     .sortedWith(compareByDescending<com.cl0de.app.api.ModelInfo> { it.release_date ?: "" }.thenBy { it.name })
                 if (ms.isNotEmpty()) {
                     item(key = "h-${p.id}") { PickHeader(p.name.ifBlank { p.id }) }
@@ -519,7 +521,7 @@ fun ModelSheet(start: String = "main", onDismiss: () -> Unit, onOfflineModels: (
                         PickRow(m.name.ifBlank { m.id }, {
                             pickModel(p.id, m)
                             if (m.variantNames.isEmpty()) onDismiss()
-                        }, selected = sel, subtitle = meta.ifBlank { null })
+                        }, selected = sel, subtitle = meta.ifBlank { null }, compact = true)
                     }
                 }
             }

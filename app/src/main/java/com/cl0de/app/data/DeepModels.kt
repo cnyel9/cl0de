@@ -25,7 +25,7 @@ object DeepModels {
     /** Name of the light agent registered next to the provider; Deep sessions run as it. */
     const val AGENT = "deep"
     const val BASE_URL = "http://127.0.0.1:8181/v1"
-    const val DEFAULT_MODEL = "gpt-4o-mini"
+    const val DEFAULT_MODEL = "claude-opus-4-7"
 
     data class DeepModel(val id: String, val providerId: String, val displayName: String, val context: Int, val image: Boolean)
 
