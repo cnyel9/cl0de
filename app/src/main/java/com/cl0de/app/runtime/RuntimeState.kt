@@ -8,6 +8,14 @@ sealed interface LlamaState {
     data class Failed(val message: String) : LlamaState
 }
 
+/** The Deep bridge (a Node.js process in the same proot fronting the DeepChat module), supervised separately. */
+sealed interface DeepState {
+    data object Stopped : DeepState
+    data object Starting : DeepState
+    data object Running : DeepState
+    data class Failed(val message: String) : DeepState
+}
+
 sealed interface RuntimeState {
     /** The environment isn't installed yet. */
     data object NotInstalled : RuntimeState

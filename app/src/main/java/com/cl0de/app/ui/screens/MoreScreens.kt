@@ -190,7 +190,7 @@ fun ServerScreen(nav: Nav) {
                         updating = runCatching { SSet.updatedTo(Graph.runtime.updateOpencode()) }.getOrElse { it.message }
                     } }
                 })
-                SettingsRow(SSet.installDevTools, subtitle = "git, ripgrep, curl, python3, build-essential", icon = Ic.Terminal, onClick = {
+                SettingsRow(SSet.installDevTools, subtitle = "git, ripgrep, curl, python3, build-essential, nodejs", icon = Ic.Terminal, onClick = {
                     val lines = mutableStateListOf<String>(); tools = lines
                     scope.launch {
                         val code = Graph.runtime.installDevTools { l -> scope.launch(Dispatchers.Main) { lines.add(l) } }

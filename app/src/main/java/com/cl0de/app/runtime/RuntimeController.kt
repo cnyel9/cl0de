@@ -1,5 +1,6 @@
 package com.cl0de.app.runtime
 
+import com.cl0de.app.data.SDeep
 import com.cl0de.app.data.SOffline
 import com.cl0de.app.data.Vault
 import android.app.Application
@@ -23,6 +24,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.net.InetSocketAddress
+import java.security.MessageDigest
 import java.net.ServerSocket
 import java.util.concurrent.TimeUnit
 
@@ -52,6 +54,13 @@ class RuntimeController(
         // The offline-model server: its own port and its own place inside the rootfs.
         const val LLAMA_PORT = 8081
         const val LLAMA_DIR = "/opt/llama-b12179"
+        // The Deep bridge: its own port and place too. One port for every build,
+        // like llama (release and debug builds do not run a bridge side by side).
+        const val DEEP_PORT = 8181
+        const val DEEP_DIR = "/opt/deep"
+        // The bundled DeepChat module is a third-party file kept byte-for-byte;
+        // the pin is the gist revision the spike verified (ayashiiiyo rev 62bbbdb).
+        const val DEEP_MODULE_SHA = "62e8885508f594012ffb8d4b4bafefc775ece69a091f79381b9c5b0910051a9a"
     }
 
     val state = MutableStateFlow<RuntimeState>(
@@ -376,9 +385,9 @@ class RuntimeController(
         p.exitValue()
     }
 
-    /** git, ripgrep and the like: without them the agent in Ubuntu is nearly useless. */
+    /** git, ripgrep and the like: without them the agent in Ubuntu is nearly useless. nodejs also powers the Deep bridge. */
     suspend fun installDevTools(onLine: (String) -> Unit): Int {
-        val script = "apt-get update && apt-get install -y --no-install-recommends git ripgrep curl ca-certificates openssh-client unzip less nano python3 build-essential"
+        val script = "apt-get update && apt-get install -y --no-install-recommends git ripgrep curl ca-certificates openssh-client unzip less nano python3 build-essential nodejs"
         return runGuest(listOf("/bin/bash", "-lc", script), onLine = onLine)
     }
 
@@ -599,9 +608,254 @@ class RuntimeController(
         return !llamaStopRequested && free()
     }
 
+    // ---------- Deep bridge (DeepChat provider) ----------
+    // A second sibling supervision, next to llama's: its own process, port, stop
+    // flag and state, so nothing here can disturb the OpenCode server or the
+    // offline-model server. Two deliberate differences from llama: the bridge is
+    // NOT stopped when the app backgrounds or the selected provider changes
+    // (the DeepChat session lives in the bridge's memory; killing it throws the
+    // session away and forces a fresh bootstrap), and its health endpoint is
+    // local liveness only, so the watchdog never kills a healthy bridge over
+    // an upstream outage. Start is lazy (a model pick warms it up), the send
+    // gate is the arbiter.
+
+    val deepState = MutableStateFlow<DeepState>(DeepState.Stopped)
+
+    @Volatile private var deepProcess: Process? = null
+    @Volatile private var deepStopRequested = false
+    /** Bumped on every start/stop transition: a superseded supervisor never touches the newer one's process. */
+    @Volatile private var deepGeneration = 0
+    private var deepJob: Job? = null
+    private val deepScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val deepLock = Any()
+    private val deepHttp = OkHttpClient.Builder().connectTimeout(3, TimeUnit.SECONDS).build()
+    @Volatile private var nodePath = "/usr/bin/node"
+
+    private fun deepLog(s: String) = logLine("[deep] $s")
+
+    /**
+     * Local liveness only: the bridge answers /health while its process lives,
+     * with its service marker in the body (so a foreign process that happens to
+     * hold the port is never adopted as the bridge). It says nothing about the
+     * DeepChat session or the network, on purpose.
+     */
+    fun deepHealthy(callTimeoutSec: Long): Boolean = try {
+        val c = deepHttp.newBuilder().callTimeout(callTimeoutSec, TimeUnit.SECONDS).build()
+        c.newCall(Request.Builder().url("http://127.0.0.1:$DEEP_PORT/health").build()).execute().use {
+            it.isSuccessful && (it.body?.string()?.contains("cl0de-deep-bridge") == true)
+        }
+    } catch (e: Exception) { false }
+
+    fun startDeep() {
+        synchronized(deepLock) {
+            val cur = deepState.value
+            if (deepJob?.isActive == true && (cur is DeepState.Starting || cur is DeepState.Running)) return
+            deepStopRequested = false
+            val gen = ++deepGeneration
+            deepState.value = DeepState.Starting
+            deepJob = deepScope.launch { superviseDeep(gen) }
+        }
+    }
+
+    /** Stop and wait: the caller (reset, service teardown) needs the process really gone. */
+    fun stopDeep() {
+        val p: Process?
+        synchronized(deepLock) {
+            deepStopRequested = true
+            deepGeneration++
+            deepJob?.cancel()
+            deepJob = null
+            p = deepProcess
+        }
+        if (p != null) {
+            p.destroy()
+            if (p.isAlive) { runCatching { p.waitFor(3, TimeUnit.SECONDS) }; if (p.isAlive) p.destroyForcibly() }
+            synchronized(deepLock) { if (deepProcess == p) deepProcess = null }
+        }
+        if (deepState.value !is DeepState.Stopped) deepState.value = DeepState.Stopped
+    }
+
+    private suspend fun superviseDeep(gen: Int) = withContext(Dispatchers.IO) {
+        fun stale() = gen != deepGeneration || deepStopRequested
+        // the same gate as the llama supervisor: never race the runtime setup
+        while (isActive && !stale() && (installing || !paths.rootfsReady)) {
+            if (state.value is RuntimeState.InstallFailed || (state.value is RuntimeState.NotInstalled && !installing)) {
+                deepState.value = DeepState.Failed(SDeep.failRuntimeNotReady)
+                return@withContext
+            }
+            delay(1000)
+        }
+        if (stale() || !isActive) return@withContext
+        // The module and bridge bytes in the rootfs must match this build's
+        // assets before anything spawns. This runs on every bridge start, not
+        // only on a fresh rootfs (configureRootfs never runs again for an
+        // existing install): an app update is how a new module version lands.
+        if (!stageDeepFiles()) { deepState.value = DeepState.Failed(SDeep.failStaging); return@withContext }
+        if (stale() || !isActive) return@withContext
+        // No JavaScript runtime is guaranteed in the rootfs (the setup installs
+        // none): provision Node.js here, on the start path, the same for fresh
+        // and long-lived rootfs installs.
+        if (!ensureNodeRuntime()) { deepState.value = DeepState.Failed(SDeep.failNoNode); return@withContext }
+        var failures = 0
+        while (isActive && !stale()) {
+            if (!awaitDeepPortFree(gen)) {
+                if (stale()) break
+                failures++
+                deepLog("port $DEEP_PORT stayed busy, retrying shortly")
+                delay((1500L * failures).coerceAtMost(30_000))
+                continue
+            }
+            deepState.value = DeepState.Starting
+            // direct argv through proot, foreground, like llama-server: no shell
+            // wrapper and no daemonizing, so the Process held here is the bridge
+            val pb = ProcessBuilder(proot.build(listOf(nodePath, "$DEEP_DIR/deep-bridge.mjs"), cwd = "/root")).redirectErrorStream(true)
+            pb.environment().putAll(proot.env())
+            val spawnedAt = System.currentTimeMillis()
+            val p = try { pb.start() } catch (e: Exception) {
+                deepLog("could not start proot: ${e.message}")
+                failures++
+                delay((1500L * failures).coerceAtMost(30_000))
+                continue
+            }
+            synchronized(deepLock) { deepProcess = p }
+            deepLog("bridge process started, waiting for it to answer…")
+            val reader = launch { runCatching { p.inputStream.bufferedReader().forEachLine { deepLog(it) } } }
+            var healthy = false
+            var dog: Job? = null
+            try {
+                // quiet startup grace, like llama: poll every second, a failure
+                // here never counts and never restarts anything
+                while (isActive && !stale() && p.isAlive && !healthy) {
+                    healthy = deepHealthy(2)
+                    if (!healthy) delay(1000)
+                }
+                if (healthy) {
+                    deepState.value = DeepState.Running
+                    failures = 0
+                    deepLog("bridge is up on port $DEEP_PORT (took ${(System.currentTimeMillis() - spawnedAt) / 1000}s)")
+                    // the watchdog only judges a bridge that already answered
+                    // once, with the same patient rules as llama's
+                    dog = launch {
+                        var bad = 0
+                        while (isActive && !stale() && p.isAlive) {
+                            delay(WATCHDOG_INTERVAL_MS)
+                            if (deepHealthy(15)) bad = 0 else {
+                                bad++
+                                deepLog("watchdog: health check failed ($bad/3)")
+                                if (bad >= 3) { deepLog("watchdog: bridge stopped answering, restarting it"); p.destroy(); break }
+                            }
+                        }
+                    }
+                    runInterruptible { p.waitFor() }
+                }
+            } finally {
+                dog?.cancel()
+                p.destroy()
+                if (p.isAlive) { runCatching { p.waitFor(3, TimeUnit.SECONDS) }; if (p.isAlive) p.destroyForcibly() }
+                synchronized(deepLock) { if (deepProcess == p) deepProcess = null }
+                // drain the reader before the death is logged below, so the
+                // bridge's last lines are not lost
+                withTimeoutOrNull(2_000) { reader.join() }
+                reader.cancel()
+            }
+            if (stale() || !isActive) break
+            failures++
+            val code = runCatching { p.exitValue() }.getOrDefault(-1)
+            val restartIn = (1500L * failures).coerceAtMost(30_000)
+            // one atomic line per death, like llama's: exit code, lifetime,
+            // whether it ever answered a health check, and what happens next
+            deepLog(
+                "bridge exited (code $code) after ${(System.currentTimeMillis() - spawnedAt) / 1000}s" +
+                    (if (healthy) ", after it had answered a health check" else ", before it ever answered a health check") +
+                    " — restarting in ${restartIn / 1000}s",
+            )
+            deepState.value = DeepState.Starting
+            delay(restartIn)
+        }
+        if (deepState.value !is DeepState.Failed) deepState.value = DeepState.Stopped
+    }
+
+    /** The llama twin of awaitPortFree, watching the deep stop flag and generation instead. */
+    private suspend fun awaitDeepPortFree(gen: Int): Boolean {
+        fun free(): Boolean = try {
+            ServerSocket().apply { reuseAddress = true; bind(InetSocketAddress("127.0.0.1", DEEP_PORT)); close() }
+            true
+        } catch (e: Exception) { false }
+        if (free()) return true
+        deepLog("port $DEEP_PORT is still held by a previous process, waiting for it to free up")
+        val deadline = System.currentTimeMillis() + PORT_FREE_WAIT_MS
+        while (!deepStopRequested && gen == deepGeneration && System.currentTimeMillis() < deadline) {
+            delay(1000)
+            if (free()) { deepLog("port $DEEP_PORT is free again"); return true }
+        }
+        return !deepStopRequested && gen == deepGeneration && free()
+    }
+
+    private fun sha256Hex(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+
+    /**
+     * Copy the Deep module and the bridge from the APK assets into the rootfs,
+     * byte-exact, host-side as the app (the cacert.pem pattern). The module's
+     * sha256 is pinned: an asset that doesn't match the pin is refused, a
+     * staged copy that differs from the asset is replaced (delete first, then
+     * write, the TarExtractor way), and the staged copy is verified afterwards,
+     * not just the asset. Only ever called while no bridge process is running.
+     */
+    private fun stageDeepFiles(): Boolean = runCatching {
+        paths.host(DEEP_DIR).mkdirs()
+        fun stage(asset: String, guest: String, pinnedSha: String?) {
+            val bytes = app.assets.open(asset).use { it.readBytes() }
+            val assetSha = sha256Hex(bytes)
+            if (pinnedSha != null) check(assetSha == pinnedSha) { "bundled $asset does not match its pinned sha256" }
+            val target = paths.host(guest)
+            val stagedSha = if (target.isFile) sha256Hex(target.readBytes()) else null
+            if (stagedSha != assetSha) {
+                target.delete()
+                target.writeBytes(bytes)
+            }
+            check(sha256Hex(target.readBytes()) == assetSha) { "staged $guest failed verification" }
+        }
+        stage("deepchat.mjs", "$DEEP_DIR/deepchat.mjs", DEEP_MODULE_SHA)
+        stage("deep-bridge.mjs", "$DEEP_DIR/deep-bridge.mjs", null)
+        true
+    }.getOrElse { e -> deepLog("staging failed: ${e.message}"); false }
+
+    /**
+     * The rootfs setup installs no JavaScript runtime: check for node inside
+     * the guest, and install the distro nodejs package when it is missing.
+     * Idempotent (the check comes first), and on the bridge's start path, so
+     * fresh and long-lived rootfs installs are provisioned alike.
+     */
+    private suspend fun ensureNodeRuntime(): Boolean {
+        suspend fun findNode(): String? {
+            val out = StringBuilder()
+            val code = runCatching {
+                runGuest(listOf("/bin/bash", "-lc", "command -v node"), timeoutSec = 120) { out.appendLine(it) }
+            }.getOrDefault(-1)
+            if (code != 0) return null
+            return out.toString().lineSequence().map { it.trim() }.lastOrNull { it.startsWith("/") && it.endsWith("node") }
+        }
+        findNode()?.let { nodePath = it; return true }
+        deepLog("Node.js is not in the environment yet, installing it (one time)…")
+        val code = runCatching {
+            runGuest(listOf("/bin/bash", "-lc", "apt-get update && apt-get install -y --no-install-recommends nodejs"), timeoutSec = 1200)
+        }.getOrDefault(-1)
+        if (code != 0) { deepLog("Node.js install failed (exit $code)"); return false }
+        val found = findNode()
+        if (found == null) { deepLog("Node.js install finished but node is still not on the guest PATH"); return false }
+        nodePath = found
+        deepLog("Node.js is ready: $found")
+        return true
+    }
+
     fun resetRuntime() {
         Vault.save()
         stopServer()
+        // the bridge holds staged files inside the rootfs: it must be really
+        // dead before the rootfs is deleted (resetRuntime never waited for
+        // llama; the bridge does not inherit that race)
+        stopDeep()
         paths.rootfs.deleteRecursively()
         paths.downloads.deleteRecursively()
         prefs.runtimeReady = false
