@@ -119,6 +119,7 @@ fun ProvidersScreen(nav: Nav) {
             scope.launch {
                 if (id == com.cl0de.app.data.FreeModels.COPILOT_ID || id == com.cl0de.app.data.FreeModels.POLLINATIONS_ID) com.cl0de.app.data.FreeModels.disable(id)
                 else if (id == com.cl0de.app.data.OfflineModels.ID) com.cl0de.app.data.OfflineModels.disable()
+                else if (id == com.cl0de.app.data.DeepModels.ID) com.cl0de.app.data.DeepModels.disable()
                 else runCatching { Graph.api.removeAuth(id); Graph.api.disposeAll() }
                 Graph.catalog.refresh(); load()
             }

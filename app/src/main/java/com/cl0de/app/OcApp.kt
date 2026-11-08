@@ -4,6 +4,7 @@ import android.app.Application
 import com.cl0de.app.api.EventHub
 import com.cl0de.app.api.OpenCodeApi
 import com.cl0de.app.data.Catalog
+import com.cl0de.app.data.DeepModels
 import com.cl0de.app.data.LiveNotify
 import com.cl0de.app.data.PhoneBridge
 import com.cl0de.app.data.Devices
@@ -52,6 +53,20 @@ object Graph {
         devices = Devices(prefs)
         api = OpenCodeApi(prefs)
         runtime = RuntimeController(a, paths, prefs, api)
+        // Deep fresh-install seed: the verdict is latched once, here, before any
+        // refresh or inference can change the evidence it rests on. A single new
+        // pref key proves nothing (an old user's prefs file survives the update
+        // and reads the same as a fresh install's), so "fresh" needs every
+        // never-used signal at once: never onboarded, no model ever selected,
+        // the runtime never installed, and no global config in the rootfs or in
+        // the vault. The latch only ever sets pending; execution clears it.
+        if (!prefs.deepSeedDone && !prefs.deepSeedPending) {
+            val configInRootfs = paths.host("/root/.config/opencode/opencode.jsonc").exists()
+            val configInVault = java.io.File(paths.rootfs.parentFile, "vault/root/.config/opencode/opencode.jsonc").exists()
+            if (!prefs.onboarded && !prefs.hasModel && !prefs.runtimeReady && !configInRootfs && !configInVault) {
+                prefs.deepSeedPending = true
+            }
+        }
         // people who used the app before the welcome screen existed don't see it again
         if (!prefs.onboarded && paths.rootfsReady && prefs.loginSeen) prefs.onboarded = true
         events = EventHub(api, runtime)
@@ -67,6 +82,10 @@ object Graph {
         LiveNotify.start()
         // the server is up: connect the "phone" MCP to it (the config entry changes only when needed)
         scope.launch { runtime.state.collect { if (it is com.cl0de.app.runtime.RuntimeState.Running) PhoneBridge.register() } }
+        // the server is up: the Deep provider registers itself (and seeds the
+        // fresh-install default); the sync verifies itself and retries on the
+        // next Running when it didn't land
+        scope.launch { runtime.state.collect { if (it is com.cl0de.app.runtime.RuntimeState.Running) DeepModels.syncProvider() } }
         Memory.sync()
         com.cl0de.app.data.AppLang.applyRule()
         Vault.restore()

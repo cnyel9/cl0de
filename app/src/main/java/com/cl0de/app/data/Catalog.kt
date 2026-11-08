@@ -43,6 +43,10 @@ class Catalog(private val api: OpenCodeApi, private val prefs: Prefs, private va
 
     /** If the selected model is gone (first launch or the provider was disconnected), take the best available one. */
     private fun ensureSelection() {
+        // a latched fresh install is waiting for its Deep seed: an auto-picked
+        // fallback here would read as "the user already has a model" and close
+        // the seed's door before it ever runs (the seed overwrites prefs itself)
+        if (prefs.deepSeedPending) return
         val list = providers.value
         if (list.isEmpty()) return
         if (prefs.hasModel && model(prefs.providerId, prefs.modelId) != null) return

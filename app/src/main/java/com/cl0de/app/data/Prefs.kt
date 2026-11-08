@@ -116,6 +116,13 @@ class Prefs(ctx: Context) {
     var runtimeReady by bool("runtime_ready", false)
     var opencodeVersion by str("opencode_version", "")
 
+    // Deep provider (DeepChat bridge in the same rootfs)
+    /** The user disconnected Deep in Providers: auto-registration stays off (set only by DeepModels.disable). */
+    var deepDisabled by bool("deep_disabled", false)
+    /** Fresh-install verdict for the Deep default model, latched once in Graph.init; execution clears it. */
+    var deepSeedPending by bool("deep_seed_pending", false)
+    var deepSeedDone by bool("deep_seed_done", false)
+
     // Offline models (llama-server in the same rootfs)
     /** How ggml found its CPU backend last time: "", "auto", or a guest path to a backend .so. */
     var llamaBackend by str("llama_backend", "")
