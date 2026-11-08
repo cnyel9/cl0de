@@ -90,21 +90,22 @@ fun KimiCircleBtn(icon: ImageVector, onClick: () -> Unit, size: androidx.compose
     ) { Ico(icon, tint = tint, size = 22.dp) }
 }
 
-/** Model pill in the header: "OpenCode" and the model in grey, like "Kimi K2.8 Preview". */
+/** Model pill in the header: the active provider's name and the model in grey, like "Kimi K2.8 Preview". */
 @Composable
 fun KimiModelPill(onClick: () -> Unit) {
     val c = Oc.c
     val prefs = Graph.prefs
     val providers by Graph.catalog.providers.collectAsState()
+    val providerName = providers.firstOrNull { it.id == prefs.providerId }?.name?.takeIf { it.isNotBlank() } ?: prefs.providerId.ifBlank { "OpenCode" }
     val name = providers.firstOrNull { it.id == prefs.providerId }?.models?.get(prefs.modelId)?.name?.takeIf { it.isNotBlank() } ?: prefs.modelId.ifBlank { S.model }
     Row(
         Modifier.padding(start = 8.dp).height(48.dp).widthIn(max = 196.dp).clip(CircleShape).background(c.surfaceHigh.copy(alpha = 0.7f))
             .border(1.dp, c.border, CircleShape).tap(scale = 0.97f, onClick = onClick).padding(horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Txt("OpenCode", size = 17.sp, maxLines = 1)   // the model runs through OpenCode, so that's what we say, in any look
+        Txt(providerName, Modifier.widthIn(max = 90.dp), size = 17.sp, maxLines = 1)
         Spacer(Modifier.width(7.dp))
-        Txt(name.removeSuffix(" Free"), Modifier.weight(1f, fill = false), size = 17.sp, color = c.textDim, maxLines = 1)
+        Txt(name.removeSuffix(" Free").removeSuffix(" (Chat)"), Modifier.weight(1f, fill = false), size = 17.sp, color = c.textDim, maxLines = 1)
     }
 }
 
