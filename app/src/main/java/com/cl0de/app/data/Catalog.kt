@@ -53,8 +53,8 @@ class Catalog(private val api: OpenCodeApi, private val prefs: Prefs, private va
         for (p in list) {
             val m = defaults[p.id]?.let { p.models[it] } ?: p.models.values.firstOrNull() ?: continue
             prefs.providerId = p.id; prefs.modelId = m.id; prefs.variant = ""
-            // a forced switch to a cloud model releases the offline model's RAM right away
-            if (p.id != OfflineModels.ID) { Graph.runtime.stopLlama(); OfflineModels.restoreAgent() }
+            // a forced switch away from a local provider releases the offline model's RAM right away
+            OfflineModels.onModelPicked(p.id)
             return
         }
     }
@@ -66,8 +66,8 @@ class Catalog(private val api: OpenCodeApi, private val prefs: Prefs, private va
             ?: p.models.values.filter { it.id.contains("flash", true) && !it.id.contains("lite", true) }.maxByOrNull { it.id }
             ?: p.models.values.firstOrNull() ?: return
         prefs.providerId = p.id; prefs.modelId = m.id; prefs.variant = ""
-        // selecting a cloud provider's model releases the offline model's RAM right away
-        if (p.id != OfflineModels.ID) { Graph.runtime.stopLlama(); OfflineModels.restoreAgent() }
+        // the shared post-pick decision (a local pick enters its light agent, a cloud pick releases the local server)
+        OfflineModels.onModelPicked(p.id)
     }
 
     fun selectedLabel(): String {

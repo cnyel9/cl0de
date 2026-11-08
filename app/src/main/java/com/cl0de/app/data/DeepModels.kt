@@ -2,6 +2,8 @@ package com.cl0de.app.data
 
 import com.cl0de.app.Graph
 import com.cl0de.app.api.OcJson
+import com.cl0de.app.runtime.DeepState
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonObject
 import org.json.JSONArray
 import org.json.JSONObject
@@ -163,5 +165,38 @@ object DeepModels {
         runCatching { Graph.catalog.refresh() }
         Vault.save()
         synced = false
+    }
+
+    // ---------- use / chat gate ----------
+
+    /** Deep's light agent takes the session over (the generalized light-agent set lives in OfflineModels). */
+    fun activateAgent() = OfflineModels.activateLightAgent(AGENT)
+
+    /**
+     * The Deep branch of the send gate (OfflineModels.ensureForSend routes
+     * here with the send's snapshot; a remote device never reaches this, it
+     * takes the cloud branch): the light agent is enforced before anything,
+     * then the bridge must answer healthily before anything is sent. Health
+     * is checked on every send, never cached as "was ready once": the process
+     * can have died since the last send, and a restarted bridge means a new
+     * DeepChat session anyway. Starting is single-flight in RuntimeController
+     * (its job guard), so concurrent sends (the user's and a scheduled one)
+     * all wait on the same supervisor state here instead of spawning rivals.
+     */
+    suspend fun ensureForSend(modelId: String) {
+        activateAgent()
+        Graph.runtime.stopLlama()
+        byId(modelId) ?: throw Exception(SDeep.gateModelGone)
+        if (Graph.runtime.deepHealthy(2)) return
+        Graph.runtime.startDeep()
+        val deadline = System.currentTimeMillis() + 300_000
+        while (System.currentTimeMillis() < deadline) {
+            when (Graph.runtime.deepState.value) {
+                is DeepState.Running -> return
+                is DeepState.Failed -> throw Exception(SDeep.gateServerFailed)
+                else -> delay(500)
+            }
+        }
+        throw Exception(SDeep.gateServerSlow)
     }
 }

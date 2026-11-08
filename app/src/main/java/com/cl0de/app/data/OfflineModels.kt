@@ -249,23 +249,59 @@ object OfflineModels {
         Graph.api.patchGlobalConfig(OcJson.parseToJsonElement(patch.toString()) as JsonObject)
     }
 
-    /** An offline model takes the session over: remember the current agent, run as the light one. */
-    fun activateAgent() {
+    /**
+     * Every light (tool-free) chat agent: offline's own and Deep's. They share
+     * the one saved-agent slot, so the helpers work on the SET, never on a
+     * single name: entering Deep straight from offline (or back) must not save
+     * a light agent as "the agent from before" and later hand a cloud session
+     * back to it, tools off, silently.
+     */
+    private val lightAgents get() = setOf(AGENT, DeepModels.AGENT)
+
+    /** A light model takes the session over: remember the current agent (only when it isn't itself light), run as [agent]. */
+    fun activateLightAgent(agent: String) {
         val prefs = Graph.prefs
-        if (prefs.agent != AGENT) {
+        if (prefs.agent !in lightAgents) {
             prefs.agentBeforeOffline = prefs.agent
-            prefs.agent = AGENT
         }
+        prefs.agent = agent
     }
 
+    /** An offline model takes the session over: remember the current agent, run as the light one. */
+    fun activateAgent() = activateLightAgent(AGENT)
+
     /**
-     * A cloud model takes over again: hand the session back to the agent the user had
-     * before offline. Only fires while the light agent is still the selected one, so a
-     * manual agent pick made in between is never overridden.
+     * A tool model takes over again: hand the session back to the agent the user had
+     * before entering light territory, whichever light provider that was. Only fires
+     * while a light agent is still the selected one, so a manual agent pick made in
+     * between is never overridden.
      */
     fun restoreAgent() {
         val prefs = Graph.prefs
-        if (prefs.agent == AGENT) prefs.agent = prefs.agentBeforeOffline.ifBlank { "build" }
+        if (prefs.agent in lightAgents) prefs.agent = prefs.agentBeforeOffline.ifBlank { "build" }
+    }
+
+    /**
+     * The one post-pick decision, shared by every place that writes the selected
+     * model (the picker, the catalog's auto-picks, free-model activation,
+     * offline's own screen): a light provider activates its light agent, a tool
+     * provider stops the local model server and hands the saved agent back. The
+     * Deep bridge only warms up here (the send gate stays the arbiter) and is
+     * never stopped by a pick: its DeepChat session lives in its memory.
+     */
+    fun onModelPicked(providerId: String) {
+        when (providerId) {
+            ID -> activateAgent()
+            DeepModels.ID -> {
+                Graph.runtime.stopLlama()
+                DeepModels.activateAgent()
+                Graph.runtime.startDeep()
+            }
+            else -> {
+                Graph.runtime.stopLlama()
+                restoreAgent()
+            }
+        }
     }
 
     /** Re-register the provider with exactly the set of models on disk (release-1 reload pattern). */
@@ -297,30 +333,39 @@ object OfflineModels {
         prefs.providerId = ID
         prefs.modelId = m.id
         prefs.variant = ""
-        activateAgent()
+        onModelPicked(ID)
         val key = "$ID/${m.id}"
         prefs.recentModels = (listOf(key) + prefs.recentModels.split(',').filter { it.isNotBlank() && it != key }).take(6).joinToString(",")
         Graph.runtime.startLlama(m.id, guestPath(m.file), m.mmproj?.let { guestPath(it) })
     }
 
     /**
-     * The gate at the top of ChatHub.send: with a cloud model selected the local server
-     * has no business running; with an offline model selected the chat must not go out
-     * before the server answers healthily with exactly that model loaded. The session's
-     * agent is also enforced from the active model here, not left to the model pick:
-     * a resumed session whose model was already selected never replays useModel() or
-     * pickModel(), so without this the stock agent (with every tool attached) keeps
-     * serving it and the local server rejects its oversized requests outright.
+     * The gate at the top of ChatHub.send, branched on the caller's SNAPSHOT of
+     * the active provider/model (taken before any waiting, so a mid-send model
+     * switch can't pair the new model with the old model's enforcement): with a
+     * cloud model selected the local server has no business running; with an
+     * offline model selected the chat must not go out before the server answers
+     * healthily with exactly that model loaded; Deep routes to its own branch
+     * (DeepModels.ensureForSend) on this phone, and to the cloud branch while a
+     * remote device is active (the bridge and its config live locally only).
+     * The session's agent is also enforced from the active model here, not left
+     * to the model pick: a resumed session whose model was already selected
+     * never replays useModel() or pickModel(), so without this the stock agent
+     * (with every tool attached) keeps serving it and the local server rejects
+     * its oversized requests outright.
      */
-    suspend fun ensureForSend() {
-        val prefs = Graph.prefs
-        if (prefs.providerId != ID) {
+    suspend fun ensureForSend(providerId: String, modelId: String) {
+        if (providerId == DeepModels.ID && !Graph.devices.isRemote) {
+            DeepModels.ensureForSend(modelId)
+            return
+        }
+        if (providerId != ID) {
             Graph.runtime.stopLlama()
             restoreAgent()
             return
         }
         activateAgent()
-        val m = OfflineCatalog.byId(prefs.modelId) ?: throw Exception(SOffline.gateNotDownloaded)
+        val m = OfflineCatalog.byId(modelId) ?: throw Exception(SOffline.gateNotDownloaded)
         if (!isDownloaded(m)) throw Exception(SOffline.gateNotDownloaded)
         if (!engineReady()) throw Exception(SOffline.gateEngineMissing)
         val st = Graph.runtime.llamaState.value

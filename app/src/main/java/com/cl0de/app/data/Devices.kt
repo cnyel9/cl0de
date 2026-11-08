@@ -51,8 +51,11 @@ class Devices(private val prefs: Prefs) {
         activeId.value = id
         // a remote device cannot use the local offline provider at all: an
         // orphaned llama-server would keep holding its ~1.4 GB of RAM for
-        // nothing (coming back local needs nothing, ensureForSend restarts it)
-        if (id.isNotEmpty()) Graph.runtime.stopLlama()
+        // nothing (coming back local needs nothing, ensureForSend restarts it).
+        // The light agents belong to the local server's config too and a remote
+        // server does not know them, so the saved agent is handed back here as
+        // well (coming back local needs nothing, the send gate re-derives it)
+        if (id.isNotEmpty()) { Graph.runtime.stopLlama(); OfflineModels.restoreAgent() }
     }
 
     companion object {

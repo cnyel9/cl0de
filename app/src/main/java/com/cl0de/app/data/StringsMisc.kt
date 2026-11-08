@@ -13,6 +13,8 @@ object SMisc {
     val permissions get() = AppLang.s("Izin", "Permissions")
     val agents get() = AppLang.s("Agen", "Agents")
     val modelForNewMessages get() = AppLang.s("Model untuk pesan baru", "Model for new messages")
+    /** ChatHub aborts a send when the user changed the model while the local-provider gate was waiting. */
+    val modelChangedWhileSending get() = AppLang.s("Model diganti saat pengiriman disiapkan, kirim lagi.", "The model was switched while the send was being prepared, please send again.")
     val smallModel get() = AppLang.s("Model kecil", "Small model")
     val autoLabel get() = AppLang.s("Otomatis", "Auto")
     val autoTitlesSummaries get() = AppLang.s("Otomatis (judul & ringkasan)", "Auto (titles & summaries)")

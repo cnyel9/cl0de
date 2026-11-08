@@ -252,9 +252,18 @@ class ChatHub(private val api: OpenCodeApi, private val events: EventHub, privat
     private val ruled = HashMap<String, String>()
 
     suspend fun send(ctx: Context, sessionId: String, text: String, atts: List<Attachment>, keepParts: List<JsonObject> = emptyList()) {
-        // offline models: the local server must be healthy with the chosen model before anything
-        // is sent (and with a cloud model selected it must not be running at all)
-        OfflineModels.ensureForSend()
+        // the local-provider gate (offline and Deep: light agent enforcement, the local
+        // server healthy before anything is sent, the server stopped for cloud models)
+        // works from a SNAPSHOT of the selection: it can wait minutes while a local
+        // server starts, and a model switch inside that window must not pair the new
+        // model with the old model's enforced agent. If the selection moved under the
+        // gate the send is aborted instead of going out half-and-half; re-sending is
+        // the user's call
+        val providerSnap = prefs.providerId
+        val modelSnap = prefs.modelId
+        val variantSnap = prefs.variant
+        OfflineModels.ensureForSend(providerSnap, modelSnap)
+        if (prefs.providerId != providerSnap || prefs.modelId != modelSnap) throw Exception(SMisc.modelChangedWhileSending)
         val dir = session(sessionId)?.directory
         if (ruled[sessionId] != prefs.permissionMode) runCatching {
             api.setSessionPermission(sessionId, dir, permissionRules() ?: JsonArray(emptyList()))
@@ -276,7 +285,7 @@ class ChatHub(private val api: OpenCodeApi, private val events: EventHub, privat
             // in the Cl0de look the agent is the Cl0de cloud (Persona), unless turned off
             // anonymous chat: tell the agent not to remember anything from it
             val anon = if (isIncognito(sessionId)) "This is an anonymous chat. Do not save anything from it to memory, notes or files outside the task." else null
-            api.promptAsync(sessionId, dir, parts, prefs.providerId, prefs.modelId, prefs.agent, prefs.variant, listOfNotNull(Persona.instruction(), team, anon).joinToString("\n\n").ifBlank { null })
+            api.promptAsync(sessionId, dir, parts, providerSnap, modelSnap, prefs.agent, variantSnap, listOfNotNull(Persona.instruction(), team, anon).joinToString("\n\n").ifBlank { null })
         } catch (e: Exception) {
             localId?.let { chat(sessionId).dropLocal(it) }
             throw e

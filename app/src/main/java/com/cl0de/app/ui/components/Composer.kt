@@ -546,14 +546,8 @@ internal fun pickModel(providerId: String, m: com.cl0de.app.api.ModelInfo) {
     if (prefs.variant !in m.variantNames) prefs.variant = ""
     val key = "$providerId/${m.id}"
     prefs.recentModels = (listOf(key) + prefs.recentModels.split(',').filter { it.isNotBlank() && it != key }).take(6).joinToString(",")
-    // switching to a cloud model releases the offline model's RAM: the local server stops
-    // and the session leaves the light offline agent; picking an offline model enters it
-    if (providerId != com.cl0de.app.data.OfflineModels.ID) {
-        Graph.runtime.stopLlama()
-        com.cl0de.app.data.OfflineModels.restoreAgent()
-    } else {
-        com.cl0de.app.data.OfflineModels.activateAgent()
-    }
+    // the one shared post-pick decision for every provider kind (offline, Deep, cloud)
+    com.cl0de.app.data.OfflineModels.onModelPicked(providerId)
 }
 
 /** The main model picker page, like Claude mobile: a short list as a card, a hint, Effort and "More models". */
