@@ -71,10 +71,30 @@ object DeepModels {
         (0 until arr.length()).map { arr.getString(it) }
     }.getOrDefault(emptyList())
 
-    /** The "(Chat)" suffix is the picker's label for this provider's nature, exactly like "(Offline)". */
+    /**
+     * The "(Chat)" suffix is the picker's label for this provider's nature, exactly like "(Offline)".
+     *
+     * attachment and modalities declare image input for EVERY model, not just
+     * the vision ones (tester7): OpenCode cannot discover a custom provider's
+     * model capabilities, so without modalities it treats the model as
+     * text-only and silently drops image attachments before the request is
+     * even built (the tester6 device bridge log showed parts=[text] only, the
+     * file name surviving as text). The bridge is the one that sorts vision
+     * from text, from the service's own catalog: vision models get the raw
+     * image, text models get the relayed description. A text model declared
+     * text-only here would lose its image before the bridge could relay it.
+     * [DeepModel.image] stays as the record of that service-side split; it no
+     * longer gates this declaration.
+     */
     private fun modelJson(m: DeepModel) = JSONObject()
         .put("name", "${m.displayName} (Chat)")
-        .put("tool_call", false).put("reasoning", false).put("attachment", m.image)
+        .put("tool_call", false).put("reasoning", false).put("attachment", true)
+        .put(
+            "modalities",
+            JSONObject()
+                .put("input", JSONArray().put("text").put("image"))
+                .put("output", JSONArray().put("text")),
+        )
         .put("limit", JSONObject().put("context", m.context).put("output", 4096))
 
     /**
