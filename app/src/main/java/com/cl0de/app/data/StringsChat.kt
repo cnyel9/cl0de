@@ -245,6 +245,11 @@ object SChat {
     val verbWorking get() = AppLang.s("bekerja", "working")
     fun elapsedStop(s: Long) = AppLang.s("  $s dtk · ketuk berhenti untuk menyela", "  ${s}s · stop to interrupt")
     fun opencodeIs(verb: String) = AppLang.s("OpenCode sedang $verb…", "OpenCode is $verb…")
+    // image generation wait stages (the flux-schnell placeholder in the chat tail)
+    val imgSketching get() = AppLang.s("Membuat sketsa", "Sketching")
+    val imgDrafting get() = AppLang.s("Membuat draf pertama", "Making the first draft")
+    val imgComposing get() = AppLang.s("Menata adegan", "Arranging the scene")
+    val imgFinishing get() = AppLang.s("Menyelesaikan gambar", "Finishing the image")
 
     // ---------- chat extras ----------
     val taskInterruptedCaps get() = AppLang.s("TUGAS TERHENTI", "TASK INTERRUPTED")

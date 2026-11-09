@@ -104,6 +104,11 @@ fun ChatScreen(id: String, nav: Nav, onMenu: () -> Unit) {
     var stick by remember { mutableStateOf(true) }
     var voice by remember { mutableStateOf(false) }
     var sendingNow by remember { mutableStateOf(false) }
+    // the model this screen's latest send actually used, recorded at send time
+    // (the same snapshot discipline as ChatHub's own): the busy tail keys the
+    // image placeholder off it, so moving the picker mid-wait cannot change
+    // the shape of a wait already in flight
+    var sentModel by remember(id) { mutableStateOf<Pair<String, String>?>(null) }
 
     LaunchedEffect(id) {
         if (chat.directory == null) chat.directory = hub.session(id)?.directory
@@ -162,6 +167,7 @@ fun ChatScreen(id: String, nav: Nav, onMenu: () -> Unit) {
     fun beginEdit(m: ChatMessage) { editing = m; state.attachments.clear(); state.text = userText(m) }
     fun retry(m: ChatMessage) {
         val parent = chat.messages.firstOrNull { it.id == m.info.parentID } ?: return
+        sentModel = Graph.prefs.providerId to Graph.prefs.modelId
         scope.launch { runCatching { hub.edit(ctx, id, parent, userText(parent), emptyList()) }.onFailure { hub.toasts.tryEmit(it.message ?: SChat.retryFailed) } }
     }
 
@@ -238,7 +244,18 @@ fun ChatScreen(id: String, nav: Nav, onMenu: () -> Unit) {
                         // "Thinking…" fades in and out: without it the chat tail jumped in height
                         Column(Modifier.fillMaxWidth().animateContentSize(tween(140)).padding(horizontal = 20.dp)) {
                             chat.loadError?.let { Txt(it, size = 14.sp, color = c.danger) }
-                            if (busy) com.cl0de.app.ui.components.ThinkingIndicator(
+                            // a send to Deep's image model waits on one end-of-turn
+                            // bridge reply: for exactly the wait's lifetime
+                            // (sendingNow || busy), keyed by the send-time model
+                            // snapshot (live prefs only when this screen never
+                            // sent), the tail shows the picture placeholder
+                            // instead of the generic "Thinking…"
+                            val snap = sentModel
+                            val imageWait = (busy || sendingNow) &&
+                                (snap?.first ?: Graph.prefs.providerId) == com.cl0de.app.data.DeepModels.ID &&
+                                (snap?.second ?: Graph.prefs.modelId) == "flux-schnell"
+                            if (imageWait) com.cl0de.app.ui.components.ImageGeneratingPlaceholder(Modifier.padding(vertical = 4.dp))
+                            else if (busy) com.cl0de.app.ui.components.ThinkingIndicator(
                                 if (statuses[id] == "retry") com.cl0de.app.ui.components.Work.Wait else workKind(chat.messages.lastOrNull()),
                                 Modifier.padding(vertical = 4.dp),
                             )
@@ -296,7 +313,7 @@ fun ChatScreen(id: String, nav: Nav, onMenu: () -> Unit) {
                     val text = state.text.trim()
                     val atts = state.attachments.toList()
                     val e = editing
-                    state.clear(); stick = true; editing = null; sendingNow = true
+                    state.clear(); stick = true; editing = null; sentModel = Graph.prefs.providerId to Graph.prefs.modelId; sendingNow = true
                     scope.launch {
                         runCatching { if (e != null) hub.edit(ctx, id, e, text, atts) else hub.send(ctx, id, text, atts) }
                             .onFailure { hub.toasts.tryEmit(it.message ?: SChat.sendFailed) }
