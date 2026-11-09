@@ -6,7 +6,7 @@ on:
       tag:
         description: "Tag release tujuan"
         required: true
-        default: "v0.0.1-tester3"
+        default: "v0.0.8"
         type: string
       source_run_id:
         description: "Run ID build sumber artifact terverifikasi"
@@ -16,7 +16,7 @@ on:
       prerelease:
         description: "Tandai sebagai pre-release"
         required: true
-        default: true
+        default: false
         type: boolean
 
 permissions:
@@ -45,9 +45,9 @@ jobs:
           echo "apk count: $COUNT"
           test "$COUNT" -eq 1
           APK=$(find dl -type f -name "*.apk" | head -1)
-          cp "$APK" Cl0de-0.0.1-tester3.apk
-          ls -l Cl0de-0.0.1-tester3.apk
-          sha256sum Cl0de-0.0.1-tester3.apk
+          cp "$APK" Cl0de-0.0.8.apk
+          ls -l Cl0de-0.0.8.apk
+          sha256sum Cl0de-0.0.8.apk
 
       - name: Create release and upload APK
         env:
@@ -58,12 +58,12 @@ jobs:
           PRE=""
           if [ "${{ inputs.prerelease }}" = "true" ]; then PRE="--prerelease"; fi
           if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
-            gh release upload "$TAG" Cl0de-0.0.1-tester3.apk --repo "${{ github.repository }}" --clobber
+            gh release upload "$TAG" Cl0de-0.0.8.apk --repo "${{ github.repository }}" --clobber
           else
-            gh release create "$TAG" Cl0de-0.0.1-tester3.apk \
+            gh release create "$TAG" Cl0de-0.0.8.apk \
               --repo "${{ github.repository }}" \
               --target "${{ github.sha }}" \
-              --title "Cl0de 0.0.1 tester3" \
+              --title "Cl0de 0.0.8" \
               --notes-file "docs/releases/$TAG.md" \
               $PRE
           fi
