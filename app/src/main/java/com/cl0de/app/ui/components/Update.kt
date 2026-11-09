@@ -47,8 +47,9 @@ import com.cl0de.app.ui.theme.Oc
 object UpdateUi { val open = mutableStateOf(false) }
 
 /**
- * The "Update available" window: checks GitHub by itself on launch and, if there's a new version,
- * shows it with an Install button, then a download with progress and the system installer.
+ * The update announcer: checks GitHub by itself on launch and on every resume. A fresh version
+ * pops up as a dialog with an Install button; the download progress and the system installer
+ * run through the sheet below, which is also the manual window opened from "About".
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,21 +64,57 @@ fun UpdateHost() {
         is State.Failed -> s.r
         else -> null
     }
-    // the window pops up by itself only for a new version that wasn't skipped or dismissed
-    val auto = r != null && r.tag != Graph.prefs.updateSkipped && r.tag != dismissed
+    val ctx = LocalContext.current
+    var allowed by remember { mutableStateOf(Updater.canInstall(ctx)) }
+    val owner = LocalLifecycleOwner.current
+    // every return to the app re-checks for updates (the check itself is unthrottled now) and refreshes the install permission
+    DisposableEffect(owner) {
+        val o = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_RESUME) { allowed = Updater.canInstall(ctx); Updater.autoCheck() } }
+        owner.lifecycle.addObserver(o)
+        onDispose { owner.lifecycle.removeObserver(o) }
+    }
+    // A fresh version announces itself as a dialog, on every route (this host lives in the root).
+    // "Later" skips the tag for good, exactly like the sheet's skip below; download and install
+    // progress stay with the sheet, so this dialog only ever shows the Available state and the
+    // two never appear together for the same release.
+    val showDialog = st is State.Available && r != null && r.tag != Graph.prefs.updateSkipped && r.tag != dismissed && !UpdateUi.open.value
+    if (showDialog && r != null) {
+        val dc = Oc.c
+        OcDialog(
+            title = SSet.updateAvailable,
+            onDismiss = { Graph.prefs.updateSkipped = r.tag; dismissed = r.tag },
+            confirmText = if (allowed) SSet.install else SSet.allowInstalls,
+            onConfirm = { if (allowed) Updater.install(ctx, r) else Updater.openInstallPermission(ctx) },
+            dismissText = SSet.later,
+        ) {
+            Column {
+                Txt("v${Updater.current}  →  ${r.name.removePrefix("v").let { "v$it" }}", size = 15.sp, color = dc.textDim)
+                if (!allowed) {
+                    Spacer(Modifier.height(10.dp))
+                    Txt(SSet.androidAsksInstall, size = 14.sp, color = dc.textDim, lineHeight = 20.sp)
+                }
+                if (r.notes.isNotBlank()) {
+                    Spacer(Modifier.height(14.dp))
+                    Box(Modifier.fillMaxWidth().heightIn(max = 300.dp).clip(RoundedCornerShape(16.dp)).background(dc.surfaceHigh).verticalScroll(rememberScrollState()).padding(16.dp)) {
+                        Txt(r.notes.replace("**", "").replace(Regex("(?m)^- "), "•  ").trim(), size = 14.sp, lineHeight = 20.sp)
+                    }
+                }
+                if (BuildConfig.DEBUG) {
+                    Spacer(Modifier.height(10.dp))
+                    Txt(SSet.testBuildNote, size = 13.sp, color = dc.textDim)
+                }
+            }
+        }
+        return
+    }
+    // the sheet pops up by itself only for an in-flight or failed install (Available belongs to the dialog),
+    // and only for a version that wasn't skipped or dismissed
+    val auto = r != null && (st is State.Downloading || st is State.Installing || st is State.Failed) && r.tag != Graph.prefs.updateSkipped && r.tag != dismissed
     if (!UpdateUi.open.value && !auto) return
     if (UpdateUi.open.value && st is State.Idle) LaunchedEffect(Unit) { Updater.check() }
 
     val c = Oc.c
-    val ctx = LocalContext.current
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var allowed by remember { mutableStateOf(Updater.canInstall(ctx)) }
-    val owner = LocalLifecycleOwner.current
-    DisposableEffect(owner) {
-        val o = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_RESUME) allowed = Updater.canInstall(ctx) }
-        owner.lifecycle.addObserver(o)
-        onDispose { owner.lifecycle.removeObserver(o) }
-    }
     fun close() { UpdateUi.open.value = false; if (r != null) dismissed = r.tag }
 
     ModalBottomSheet(onDismissRequest = ::close, sheetState = sheet, containerColor = c.surface, dragHandle = null, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {

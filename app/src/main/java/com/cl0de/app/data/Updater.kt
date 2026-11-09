@@ -30,12 +30,12 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
- * Updates from GitHub releases: every few hours it checks cnyel9/cl0de,
- * compares the version with the installed one, downloads the APK on "Install" and hands it to the system installer.
+ * Updates from GitHub releases: it checks cnyel9/cl0de on every launch and
+ * every return to the app, compares the version with the installed one,
+ * downloads the APK on "Install" and hands it to the system installer.
  */
 object Updater {
     const val REPO = "cnyel9/cl0de"
-    private const val EVERY_MS = 6 * 60 * 60 * 1000L
 
     data class Release(val tag: String, val name: String, val notes: String, val apkUrl: String, val size: Long, val page: String)
 
@@ -55,10 +55,9 @@ object Updater {
 
     val current: String get() = BuildConfig.VERSION_NAME
 
-    /** Auto check on launch: at most once every 6 hours and only if it's on. */
+    /** Auto check: on every launch and every resume, unthrottled, and only if it's on. [check] itself refuses to run twice at once. */
     fun autoCheck() {
-        val p = Graph.prefs
-        if (!p.updateAuto || System.currentTimeMillis() - p.updateCheckedAt < EVERY_MS) return
+        if (!Graph.prefs.updateAuto) return
         check()
     }
 
@@ -86,6 +85,8 @@ object Updater {
         return Json.parseToJsonElement(body).jsonArray.mapNotNull { e ->
             val o = e.jsonObject
             if (o["draft"]?.jsonPrimitive?.boolean == true) return@mapNotNull null
+            // prereleases are never offered: with a check on every resume, a test release must not reach every install
+            if (o["prerelease"]?.jsonPrimitive?.boolean == true) return@mapNotNull null
             val apk = (o["assets"] as? JsonArray)?.map { it.jsonObject }?.firstOrNull { it.str("name").endsWith(".apk") } ?: return@mapNotNull null
             Release(
                 tag = o.str("tag_name"), name = o.str("name").ifBlank { o.str("tag_name") }, notes = o.str("body"),
@@ -96,11 +97,11 @@ object Updater {
 
     private fun JsonObject.str(k: String) = this[k]?.jsonPrimitive?.content.orEmpty()
 
-    /** "v0.0.1-beta-3" vs "0.0.1 beta-2": numbers first, then the stage (alpha < beta < rc < release) and its number. */
+    /** "v0.0.1-beta-3" vs "0.0.1 beta-2": numbers first, then the stage (alpha < beta < rc < test < release) and its number. "test" ranks below release so a "0.0.3 test" build is offered the plain "0.0.3" release. */
     fun compare(a: String, b: String): Int {
         fun key(v: String): List<Int> {
-            val m = Regex("""(\d+)\.(\d+)(?:\.(\d+))?(?:[\s._-]*(alpha|beta|rc)[\s._-]*(\d+)?)?""", RegexOption.IGNORE_CASE).find(v) ?: return listOf(0, 0, 0, 0, 0)
-            val stage = when (m.groupValues[4].lowercase()) { "alpha" -> 0; "beta" -> 1; "rc" -> 2; else -> 3 }
+            val m = Regex("""(\d+)\.(\d+)(?:\.(\d+))?(?:[\s._-]*(alpha|beta|rc|test)[\s._-]*(\d+)?)?""", RegexOption.IGNORE_CASE).find(v) ?: return listOf(0, 0, 0, 0, 0)
+            val stage = when (m.groupValues[4].lowercase()) { "alpha" -> 0; "beta" -> 1; "rc" -> 2; "test" -> 3; else -> 4 }
             return listOf(m.groupValues[1].toInt(), m.groupValues[2].toInt(), m.groupValues[3].toIntOrNull() ?: 0, stage, m.groupValues[5].toIntOrNull() ?: 0)
         }
         val ka = key(a); val kb = key(b)
