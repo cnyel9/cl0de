@@ -19,7 +19,7 @@
 
 import http from 'node:http';
 import { createHash } from 'node:crypto';
-import { chat, claimReward, getConfig } from './deepchat.mjs';
+import { chat, claimReward, generateImage, getConfig, imageToImage } from './deepchat.mjs';
 
 const HOST = '127.0.0.1';
 const PORT = 8181;
@@ -38,6 +38,9 @@ const REFILL_MAX_CLAIMS = 5;
 const REFILL_WALL_MS = 6_000;
 const REFILL_GAP_MS = 150;
 const CHAT_FLOW_TIMEOUT_MS = 250_000;
+// Image route budget: one generation attempt, the optional refill (~6 s)
+// and one retry, mirroring the chat flow's reasoning.
+const IMAGE_FLOW_TIMEOUT_MS = 250_000;
 // Image relay for text-only models: one gpt-4o-mini call describes the image
 // and the description travels as text. Its own shorter race, and successful
 // descriptions are cached per image (the fallback scan would otherwise pay
@@ -84,6 +87,17 @@ let catalog = [
   { providerId: 'perplexity', id: 'sonar', displayName: 'Sonar', contextWindow: 200000, image: false },
 ];
 let index = new Map(catalog.map((m) => [m.id, m]));
+
+// Image models live OUTSIDE the chat catalog on purpose: refreshCatalog()
+// rebuilds `catalog` from getConfig() with a text_chat filter and would
+// wipe anything parked inside it. They merge into /v1/models answers and
+// are intercepted in handleChat before the chat entry lookup (an unknown
+// id there is a 404). The OpenCode-side id carries no slash; the module's
+// own provider/model pair rides in the call options.
+const IMAGE_MODELS = [
+  { providerId: 'flux', moduleModelId: 'flux/schnell', id: 'flux-schnell', displayName: 'Flux Schnell' },
+];
+const imageIndex = new Map(IMAGE_MODELS.map((m) => [m.id, m]));
 
 async function refreshCatalog() {
   try {
@@ -227,11 +241,11 @@ function requiredCredits(err) {
   return m ? Number(m[1]) : null;
 }
 
-// Runs INSIDE the chat flow's chain link: claim a few times, then retry the
-// chat once. Gives up (rethrowing the original 402 untouched) when two
+// Runs INSIDE a flow's chain link: claim a few times, then retry the call
+// once. Gives up (rethrowing the original 402 untouched) when two
 // claims in a row fail, when the daily ad quota is spent with the balance
 // still short, or when the wall budget runs out before any claim succeeded.
-async function refillThenRetry(firstError, message, options) {
+async function refillThenRetry(firstError, retryFn, label = 'chat') {
   const required = requiredCredits(firstError);
   const started = Date.now();
   let claims = 0;
@@ -269,9 +283,9 @@ async function refillThenRetry(firstError, message, options) {
     throw firstError;
   }
   console.log(
-    `credit refill: ${claims} claims in ${Date.now() - started}ms, balance=${lastBalance ?? '?'}, required~=${required ?? '?'}, retrying chat once`,
+    `credit refill: ${claims} claims in ${Date.now() - started}ms, balance=${lastBalance ?? '?'}, required~=${required ?? '?'}, retrying ${label} once`,
   );
-  return chat(message, options);
+  return retryFn();
 }
 
 // A chat send as ONE chain link: the first attempt, the optional refill and
@@ -284,9 +298,70 @@ function callChatFlow(message, options) {
     } catch (e) {
       if (!isCreditError(e)) throw e;
       console.log(`chat ${options.modelId} hit insufficient credits, starting bridge refill`);
-      return refillThenRetry(e, message, options);
+      return refillThenRetry(e, () => chat(message, options));
     }
   }, CHAT_FLOW_TIMEOUT_MS);
+}
+
+// ---------- image generation route ----------
+
+// One image call as ONE chain link (the module session is shared with
+// chat, so generations serialize with it): the first attempt, the
+// optional refill and the single retry all live inside the same link.
+function callImageFlow(mod, prompt, imageUrl) {
+  const attempt = () => imageUrl
+    ? imageToImage(prompt, imageUrl, { providerId: mod.providerId, modelId: mod.moduleModelId })
+    : generateImage(prompt, { providerId: mod.providerId, modelId: mod.moduleModelId });
+  return enqueue(async () => {
+    try {
+      return await attempt();
+    } catch (e) {
+      if (!isCreditError(e)) throw e;
+      console.log(`image ${mod.id} hit insufficient credits, starting bridge refill`);
+      return refillThenRetry(e, attempt, 'image');
+    }
+  }, IMAGE_FLOW_TIMEOUT_MS);
+}
+
+// The flux-schnell route: stateless, the last user turn only (no system
+// prompt, no memory block, no history, never the vision/relay logic). The
+// prompt is that turn's text; an attached image (the chat scan's data URL,
+// exactly the string form the module accepts) turns the call into
+// imageToImage. The reply text is one opener line plus the image as
+// markdown on its own line, pointing at the service's own https URL: the
+// module's result bytes are never downloaded here. Every failure becomes
+// a clear Indonesian reply text, never a raw upstream error.
+async function runImageRoute(mod, prompt, imageUrl, started) {
+  const route = imageUrl ? 'image-to-image' : 'image-generate';
+  if (!prompt && !imageUrl) {
+    console.log(`image route=${route} skipped in 0ms: no prompt text`);
+    return { reply: 'Tulis dulu gambar apa yang ingin dibuat, lalu kirim lagi.' };
+  }
+  const text = prompt || 'Improve this image: keep the same subject and composition, cleaner and more detailed.';
+  let result;
+  try {
+    result = await callImageFlow(mod, text, imageUrl);
+  } catch (e) {
+    console.log(`image route=${route} failed in ${Date.now() - started}ms: ${cleanMessage(e).slice(0, 160)}`);
+    return {
+      reply: isCreditError(e)
+        ? 'Maaf, kredit DeepChat sedang habis dan isi ulang otomatisnya belum berhasil. Coba lagi sebentar lagi.'
+        : 'Maaf, gambarnya gagal dibuat saat ini. Coba ulangi sebentar lagi, atau ubah sedikit perintahnya.',
+    };
+  }
+  const first = Array.isArray(result?.images) ? result.images[0] : null;
+  const url = typeof first === 'string' ? first : (typeof first?.url === 'string' ? first.url : null);
+  if (!url) {
+    console.log(`image route=${route} empty in ${Date.now() - started}ms, creditsUsed=${result?.creditsUsed ?? '?'}`);
+    return { reply: 'Maaf, layanan gambar tidak mengembalikan gambar apa pun kali ini. Coba ulangi sebentar lagi.' };
+  }
+  let host = '?';
+  try { host = new URL(url).host; } catch { /* the URL is forwarded as-is either way */ }
+  console.log(
+    `image route=${route} ok in ${Date.now() - started}ms, creditsUsed=${result?.creditsUsed ?? '?'}, creditsRemaining=${result?.creditsRemaining ?? '?'}, host=${host}`,
+  );
+  const opener = imageUrl ? 'Ini gambar hasil ubahannya:' : 'Ini gambar hasil buatannya:';
+  return { reply: `${opener}\n\n![gambar](${url})`, creditsUsed: result?.creditsUsed, creditsRemaining: result?.creditsRemaining };
 }
 
 // ---------- image relay (text-only models) ----------
@@ -369,7 +444,8 @@ async function handleChat(req, res) {
     return;
   }
 
-  const entry = index.get(body?.model);
+  const imgMod = imageIndex.get(body?.model);
+  const entry = imgMod ?? index.get(body?.model);
   if (!entry) {
     sendError(res, 404, `Unknown Deep model: ${String(body?.model ?? '')}`);
     return;
@@ -462,59 +538,65 @@ async function handleChat(req, res) {
     (found.dropped ? ` imageDropped=${found.dropped}` : ''),
   );
 
-  let image = null;
-  if (entry.image) {
-    // Vision models keep the direct path: the image rides as the module's
-    // one image slot.
-    image = found.image?.url ?? null;
-    // The module throws on an empty message: an image-only turn gets a
-    // placeholder text instead.
-    if (!message && image) message = 'Describe this image.';
-  } else if (found.image) {
-    // Text-only models cannot see: a vision model describes the image and
-    // the description is prepended as text. A failed relay never fails the
-    // chat; a short note takes the description's place.
-    let block;
-    try {
-      const desc = await describeImage(found.image.url);
-      block = desc
-        ? `[Pengguna melampirkan sebuah gambar. Kamu tidak dapat melihat gambar secara langsung; yang berikut ini adalah deskripsi isi gambar tersebut, dibuat oleh model vision: "${desc}"]`
-        : RELAY_FAIL_BLOCK;
-    } catch (e) {
-      console.log(`relay failed, continuing without a description: ${cleanMessage(e).slice(0, 160)}`);
-      block = RELAY_FAIL_BLOCK;
-    }
-    message = message ? `${block}\n\n${message}` : (block === RELAY_FAIL_BLOCK ? block : `${block}\n\nJelaskan gambar ini.`);
-  }
-  if (!message) {
-    sendError(res, 400, 'The last user message has no text');
-    return;
-  }
-
-  // History is every mapped turn BEFORE the last user message; the last
-  // message itself is never duplicated into it.
-  const history = [];
-  for (let i = 0; i < lastUser; i++) {
-    const m = messages[i];
-    if (!m || (m.role !== 'user' && m.role !== 'assistant')) continue;
-    const t = textOf(m.content);
-    if (t) history.push({ role: m.role, content: t });
-  }
-
-  const options = { providerId: entry.providerId, modelId: entry.id };
-  if (systemPrompt) options.systemPrompt = systemPrompt;
-  if (history.length > 0) options.conversationHistory = history;
-  if (image) options.image = image;
-  // deepThink / deepResearch / writeCode are never mapped in v1.
-
   const started = Date.now();
   let result;
-  try {
-    result = await callChatFlow(message, options);
-  } catch (e) {
-    console.log(`chat ${entry.id} failed after ${Date.now() - started}ms: ${cleanMessage(e).slice(0, 160)}`);
-    sendError(res, upstreamStatus(e), e?.message ?? 'DeepChat request failed');
-    return;
+  if (imgMod) {
+    // Image model: its own route, fed by the scan above and nothing else
+    // (no system prompt, no memory block, no history, no vision/relay pass).
+    result = await runImageRoute(imgMod, message, found.image?.url ?? null, started);
+  } else {
+    let image = null;
+    if (entry.image) {
+      // Vision models keep the direct path: the image rides as the module's
+      // one image slot.
+      image = found.image?.url ?? null;
+      // The module throws on an empty message: an image-only turn gets a
+      // placeholder text instead.
+      if (!message && image) message = 'Describe this image.';
+    } else if (found.image) {
+      // Text-only models cannot see: a vision model describes the image and
+      // the description is prepended as text. A failed relay never fails the
+      // chat; a short note takes the description's place.
+      let block;
+      try {
+        const desc = await describeImage(found.image.url);
+        block = desc
+          ? `[Pengguna melampirkan sebuah gambar. Kamu tidak dapat melihat gambar secara langsung; yang berikut ini adalah deskripsi isi gambar tersebut, dibuat oleh model vision: "${desc}"]`
+          : RELAY_FAIL_BLOCK;
+      } catch (e) {
+        console.log(`relay failed, continuing without a description: ${cleanMessage(e).slice(0, 160)}`);
+        block = RELAY_FAIL_BLOCK;
+      }
+      message = message ? `${block}\n\n${message}` : (block === RELAY_FAIL_BLOCK ? block : `${block}\n\nJelaskan gambar ini.`);
+    }
+    if (!message) {
+      sendError(res, 400, 'The last user message has no text');
+      return;
+    }
+
+    // History is every mapped turn BEFORE the last user message; the last
+    // message itself is never duplicated into it.
+    const history = [];
+    for (let i = 0; i < lastUser; i++) {
+      const m = messages[i];
+      if (!m || (m.role !== 'user' && m.role !== 'assistant')) continue;
+      const t = textOf(m.content);
+      if (t) history.push({ role: m.role, content: t });
+    }
+
+    const options = { providerId: entry.providerId, modelId: entry.id };
+    if (systemPrompt) options.systemPrompt = systemPrompt;
+    if (history.length > 0) options.conversationHistory = history;
+    if (image) options.image = image;
+    // deepThink / deepResearch / writeCode are never mapped in v1.
+
+    try {
+      result = await callChatFlow(message, options);
+    } catch (e) {
+      console.log(`chat ${entry.id} failed after ${Date.now() - started}ms: ${cleanMessage(e).slice(0, 160)}`);
+      sendError(res, upstreamStatus(e), e?.message ?? 'DeepChat request failed');
+      return;
+    }
   }
   const reply = typeof result?.reply === 'string' ? result.reply : '';
   const md = result?.metadata ?? {};
@@ -560,7 +642,7 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && url.pathname === '/v1/models') {
     sendJson(res, 200, {
       object: 'list',
-      data: catalog.map((m) => ({ id: m.id, object: 'model', created: 0, owned_by: 'deep' })),
+      data: [...catalog, ...IMAGE_MODELS].map((m) => ({ id: m.id, object: 'model', created: 0, owned_by: 'deep' })),
     });
     return;
   }

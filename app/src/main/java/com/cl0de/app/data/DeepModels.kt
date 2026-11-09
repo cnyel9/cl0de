@@ -9,7 +9,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * The Deep provider: chat models of the DeepChat service, registered in the
+ * The Deep provider: chat models of the DeepChat service, plus one image
+ * model (Flux Schnell, at the end of the catalog), registered in the
  * OpenCode config as the OpenAI-compatible provider "deep" pointing at the
  * local bridge (a Node.js process in the same proot, supervised by
  * RuntimeController, wrapping the bundled DeepChat module untouched).
@@ -27,7 +28,7 @@ object DeepModels {
     const val BASE_URL = "http://127.0.0.1:8181/v1"
     const val DEFAULT_MODEL = "claude-opus-4-7"
 
-    data class DeepModel(val id: String, val providerId: String, val displayName: String, val context: Int, val image: Boolean)
+    data class DeepModel(val id: String, val providerId: String, val displayName: String, val context: Int, val image: Boolean, val suffix: String = " (Chat)")
 
     /**
      * The chat catalog, filtered from the service's own getConfig() snapshot
@@ -36,6 +37,14 @@ object DeepModels {
      * disables, so they are NOT here (the gist README advertises the former
      * anyway). creditCost from the catalog is deliberately not carried: the
      * spike measured actual deductions differing from it.
+     *
+     * The LAST entry is a deliberate exception, not part of that filter:
+     * flux-schnell is an image model (the bridge routes it to the module's
+     * generateImage/imageToImage, both measured in the image spike), labeled
+     * " (Gambar)" via [DeepModel.suffix]. It sits last so the picker's
+     * first-model fallback in Catalog.ensureSelection never lands on it,
+     * and the registration here is what lets the send gate's byId check and
+     * the attachment declaration treat it like every other Deep model.
      */
     val catalog: List<DeepModel> = listOf(
         DeepModel("gpt-4o-mini", "chatgpt", "GPT-4o Mini", 128000, true),
@@ -54,6 +63,7 @@ object DeepModels {
         DeepModel("mistral-large-latest", "mistral", "Mistral Large 3", 128000, false),
         DeepModel("sonar-pro", "perplexity", "Sonar Pro", 200000, false),
         DeepModel("sonar", "perplexity", "Sonar", 200000, false),
+        DeepModel("flux-schnell", "flux", "Flux Schnell", 128000, true, " (Gambar)"),
     )
 
     fun byId(id: String): DeepModel? = catalog.firstOrNull { it.id == id }
@@ -72,7 +82,8 @@ object DeepModels {
     }.getOrDefault(emptyList())
 
     /**
-     * The "(Chat)" suffix is the picker's label for this provider's nature, exactly like "(Offline)".
+     * The "(Chat)" suffix is the picker's label for this provider's nature, exactly like "(Offline)";
+     * the one image model carries " (Gambar)" instead, via [DeepModel.suffix].
      *
      * attachment and modalities declare image input for EVERY model, not just
      * the vision ones (tester7): OpenCode cannot discover a custom provider's
@@ -87,7 +98,7 @@ object DeepModels {
      * longer gates this declaration.
      */
     private fun modelJson(m: DeepModel) = JSONObject()
-        .put("name", "${m.displayName} (Chat)")
+        .put("name", "${m.displayName}${m.suffix}")
         .put("tool_call", false).put("reasoning", false).put("attachment", true)
         .put(
             "modalities",

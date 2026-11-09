@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -16,10 +17,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
@@ -34,6 +39,7 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
 import com.cl0de.app.Graph
 import com.cl0de.app.ui.theme.Ic
 import com.cl0de.app.ui.theme.Oc
@@ -46,11 +52,16 @@ private sealed interface Block {
     data class Item(val marker: String, val indent: Int, val text: String) : Block
     data class Quote(val text: String) : Block
     data class Table(val rows: List<List<String>>) : Block
+    data class Image(val alt: String, val url: String) : Block
     data object Rule : Block
 }
 
 private val fenceRe = Regex("^\\s*(```|~~~)\\s*([\\w+#.-]*)")
 private val headRe = Regex("^(#{1,6})\\s+(.*)$")
+// A whole line that is exactly one markdown image. Anchored at both ends on
+// purpose: a still-revealing reply whose image line is incomplete must not
+// form this block (it stays paragraph text until the URL is whole).
+private val imageLineRe = Regex("^!\\[([^\\]]*)\\]\\((https?://[^)\\s]+)\\)\\s*$")
 private val itemRe = Regex("^(\\s*)([-*+]|\\d+[.)])\\s+(.*)$")
 private val ruleRe = Regex("^\\s*([-*_])(\\s*\\1){2,}\\s*$")
 private val tableSepRe = Regex("^\\s*\\|?\\s*:?-{2,}:?\\s*(\\|\\s*:?-{2,}:?\\s*)*\\|?\\s*$")
@@ -76,9 +87,11 @@ private fun parseBlocks(src: String): List<Block> {
         }
         val head = headRe.find(line)
         val item = itemRe.find(line)
+        val img = imageLineRe.find(line.trim())
         when {
             line.isBlank() -> flush()
             head != null -> { flush(); out += Block.Head(head.groupValues[1].length, head.groupValues[2].trim()) }
+            img != null -> { flush(); out += Block.Image(img.groupValues[1], img.groupValues[2]) }
             ruleRe.matches(line) -> { flush(); out += Block.Rule }
             line.trimStart().startsWith(">") -> {
                 flush()
@@ -195,10 +208,32 @@ fun Markdown(text: String, modifier: Modifier = Modifier, serif: Boolean = Graph
                     Text(remember(b.text, c) { buildAnnotatedString { inline(b.text, c, mono) } }, color = c.textDim, fontSize = 18.sp, lineHeight = 27.sp, fontFamily = family)
                 }
                 is Block.Table -> TableBlock(b.rows)
+                is Block.Image -> MarkdownImage(b.alt, b.url)
                 Block.Rule -> Box(Modifier.fillMaxWidth().height(1.dp).background(c.border))
             }
         }
     }
+}
+
+/**
+ * An image on its own line (a generated picture): full column width, aspect
+ * ratio taken from the loaded image (square placeholder ratio until it
+ * lands). parseBlocks only forms the block from a complete image line, so
+ * a still-revealing reply never spawns a broken or half-loaded image here.
+ */
+@Composable
+private fun MarkdownImage(alt: String, url: String) {
+    val c = Oc.c
+    var ratio by remember(url) { mutableFloatStateOf(1f) }
+    AsyncImage(
+        model = imageModel(url), contentDescription = alt.ifBlank { null }, contentScale = ContentScale.FillWidth,
+        onSuccess = { s ->
+            val w = s.result.image.width
+            val h = s.result.image.height
+            if (w > 0 && h > 0) ratio = w.toFloat() / h.toFloat()
+        },
+        modifier = Modifier.fillMaxWidth().aspectRatio(ratio).clip(RoundedCornerShape(16.dp)).background(c.surfaceHigh),
+    )
 }
 
 @Composable
