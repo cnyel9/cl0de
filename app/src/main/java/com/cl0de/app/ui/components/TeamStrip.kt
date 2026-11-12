@@ -34,13 +34,28 @@ import com.cl0de.app.ui.theme.Oc
  * The team in a chat: a line above the input while the chat has helpers (child sessions).
  * "Team · 2 working of 3"; tapping opens a list: who, on which model, working or done.
  * Tapping a helper opens its session, so you can see what it did.
+ *
+ * Only the latest request's team is shown: helpers are spawned while a
+ * request runs, so a child born before the last user message belongs to an
+ * earlier request and must not show up or count here (a finished team from
+ * the previous message used to leak into the next one, label included).
+ * The last user message's creation time comes from the open chat itself:
+ * its messages carry the time the server recorded (the optimistic local
+ * copy carries device time until the server copy replaces it). When no
+ * user message is known yet (chat still loading), all children show, as
+ * before; the filter settles as soon as the messages land.
  */
 @Composable
 fun TeamStrip(id: String, nav: Nav) {
     val c = Oc.c
     val all by Graph.chats.allSessions.collectAsState()
     val statuses by Graph.chats.statuses.collectAsState()
-    val kids = remember(all, id) { all.values.filter { it.parentID == id }.sortedBy { it.time.created } }
+    val chat = remember(id) { Graph.chats.chat(id) }
+    val lastUserAt = chat.messages.lastOrNull { it.info.isUser }?.info?.time?.created ?: 0L
+    val kids = remember(all, id, lastUserAt) {
+        val allKids = all.values.filter { it.parentID == id }.sortedBy { it.time.created }
+        if (lastUserAt <= 0L) allKids else allKids.filter { it.time.created >= lastUserAt }
+    }
     if (kids.isEmpty()) return
     var open by remember { mutableStateOf(false) }
     val working = kids.count { (statuses[it.id] ?: "idle") != "idle" }
