@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -220,11 +221,14 @@ fun Markdown(text: String, modifier: Modifier = Modifier, serif: Boolean = Graph
  * ratio taken from the loaded image (square placeholder ratio until it
  * lands). parseBlocks only forms the block from a complete image line, so
  * a still-revealing reply never spawns a broken or half-loaded image here.
+ * Tapping opens the full-screen viewer (the same one attachments use),
+ * which closes with its X or the back button and can save the picture.
  */
 @Composable
 private fun MarkdownImage(alt: String, url: String) {
     val c = Oc.c
     var ratio by remember(url) { mutableFloatStateOf(1f) }
+    var preview by remember(url) { mutableStateOf(false) }
     AsyncImage(
         model = imageModel(url), contentDescription = alt.ifBlank { null }, contentScale = ContentScale.FillWidth,
         onSuccess = { s ->
@@ -232,8 +236,10 @@ private fun MarkdownImage(alt: String, url: String) {
             val h = s.result.image.height
             if (w > 0 && h > 0) ratio = w.toFloat() / h.toFloat()
         },
-        modifier = Modifier.fillMaxWidth().aspectRatio(ratio).clip(RoundedCornerShape(16.dp)).background(c.surfaceHigh),
+        modifier = Modifier.fillMaxWidth().aspectRatio(ratio).clip(RoundedCornerShape(16.dp)).background(c.surfaceHigh)
+            .clickable { preview = true },
     )
+    if (preview) ImageViewer(listOf(url), 0) { preview = false }
 }
 
 @Composable

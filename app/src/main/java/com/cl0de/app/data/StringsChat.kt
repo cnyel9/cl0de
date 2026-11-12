@@ -337,6 +337,7 @@ object SChat {
     fun imageSub(size: String) = AppLang.s("Gambar · $size", "Image · $size")
     val fileFallback get() = AppLang.s("BERKAS", "FILE")
     val savedToPictures get() = AppLang.s("Tersimpan di Pictures/OpenCode", "Saved to Pictures/OpenCode")
+    val imageSaveFailed get() = AppLang.s("Gagal menyimpan gambar", "Could not save the image")
 
     // ---------- intro ----------
     val startingServer get() = AppLang.s("· memulai server di HP ini…", "· starting the server on this phone…")

@@ -48,7 +48,13 @@ import com.cl0de.app.Graph
 import com.cl0de.app.data.SChat
 import com.cl0de.app.ui.theme.Ic
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 /** What to give Coil: guest Linux files live inside the rootfs on the host. */
 fun imageModel(url: String): Any =
@@ -61,6 +67,31 @@ fun imageBytes(url: String): ByteArray? = runCatching {
         else -> null
     }
 }.getOrNull()
+
+private val imageHttp = OkHttpClient.Builder().connectTimeout(20, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).build()
+
+/**
+ * Bytes plus mime for any image URL the viewer can show, remote ones included
+ * (generated pictures live on a third-party host). Blocking: call off the
+ * main thread. The mime comes from the response when there is one, so a JPEG
+ * is never saved labelled as PNG.
+ */
+private fun fetchImage(url: String): Pair<ByteArray, String>? {
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        return imageBytes(url)?.let { it to mimeOf(url) }
+    }
+    return runCatching {
+        imageHttp.newCall(Request.Builder().url(url).build()).execute().use { r ->
+            val body = r.body
+            if (!r.isSuccessful || body == null) null
+            else {
+                val bytes = body.bytes()
+                val ct = body.contentType()
+                bytes to (ct?.let { "${it.type}/${it.subtype}" } ?: mimeOf(url))
+            }
+        }
+    }.getOrNull()
+}
 
 @Composable
 fun ImageThumb(url: String, size: androidx.compose.ui.unit.Dp, onClick: () -> Unit, modifier: Modifier = Modifier) {
@@ -120,19 +151,33 @@ fun ImageViewer(urls: List<String>, start: Int, onDismiss: () -> Unit) {
 
 private fun mimeOf(url: String) = if (url.startsWith("data:")) url.substringAfter("data:").substringBefore(';') else "image/png"
 
+/**
+ * Saves the shown image into Pictures/OpenCode through MediaStore (the
+ * viewer only offers this on API 29+, where that needs no permission).
+ * Remote bytes are fetched on IO; the user always gets a toast, success
+ * or failure, instead of the old silent no-op for http URLs.
+ */
 private fun saveImage(ctx: Context, url: String) {
-    val bytes = imageBytes(url) ?: return
-    val mime = mimeOf(url)
-    val ext = mime.substringAfter('/').replace("jpeg", "jpg")
-    val values = ContentValues().apply {
-        put(MediaStore.Images.Media.DISPLAY_NAME, "opencode-${System.currentTimeMillis()}.$ext")
-        put(MediaStore.Images.Media.MIME_TYPE, mime)
-        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/OpenCode")
-    }
-    val uri = ctx.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-    if (uri != null) {
-        ctx.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
-        Toast.makeText(ctx, SChat.savedToPictures, Toast.LENGTH_SHORT).show()
+    Graph.scope.launch {
+        val ok = withContext(Dispatchers.IO) {
+            val got = fetchImage(url)
+            if (got == null) false
+            else {
+                val (bytes, mime) = got
+                val ext = mime.substringAfter('/').substringBefore(';').replace("jpeg", "jpg")
+                val values = ContentValues().apply {
+                    put(MediaStore.Images.Media.DISPLAY_NAME, "opencode-${System.currentTimeMillis()}.$ext")
+                    put(MediaStore.Images.Media.MIME_TYPE, mime)
+                    put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/OpenCode")
+                }
+                runCatching {
+                    val uri = ctx.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                    val out = uri?.let { ctx.contentResolver.openOutputStream(it) }
+                    if (out == null) false else { out.use { it.write(bytes) }; true }
+                }.getOrDefault(false)
+            }
+        }
+        Toast.makeText(ctx, if (ok) SChat.savedToPictures else SChat.imageSaveFailed, Toast.LENGTH_SHORT).show()
     }
 }
 
