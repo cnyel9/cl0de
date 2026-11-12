@@ -182,15 +182,30 @@ private fun saveImage(ctx: Context, url: String) {
 }
 
 private fun shareImage(ctx: Context, url: String) {
-    val bytes = imageBytes(url) ?: return
-    val ext = mimeOf(url).substringAfter('/').replace("jpeg", "jpg")
-    val f = File(ctx.cacheDir, "camera").apply { mkdirs() }.let { File(it, "share-${System.currentTimeMillis()}.$ext") }
-    f.writeBytes(bytes)
-    val uri = FileProvider.getUriForFile(ctx, ctx.packageName + ".files", f)
-    ctx.startActivity(
-        Intent.createChooser(
-            Intent(Intent.ACTION_SEND).setType(mimeOf(url)).putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
-            null,
+    Graph.scope.launch {
+        val got = withContext(Dispatchers.IO) { fetchImage(url) }
+        if (got == null) {
+            Toast.makeText(ctx, SChat.imageSaveFailed, Toast.LENGTH_SHORT).show()
+            return@launch
+        }
+        val (bytes, mime) = got
+        val ext = mime.substringAfter('/').substringBefore(';').replace("jpeg", "jpg")
+        val f = withContext(Dispatchers.IO) {
+            runCatching {
+                File(ctx.cacheDir, "camera").apply { mkdirs() }.let { File(it, "share-${System.currentTimeMillis()}.$ext") }
+                    .also { it.writeBytes(bytes) }
+            }.getOrNull()
+        }
+        if (f == null) {
+            Toast.makeText(ctx, SChat.imageSaveFailed, Toast.LENGTH_SHORT).show()
+            return@launch
+        }
+        val uri = FileProvider.getUriForFile(ctx, ctx.packageName + ".files", f)
+        ctx.startActivity(
+            Intent.createChooser(
+                Intent(Intent.ACTION_SEND).setType(mime).putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
+                null,
+            )
         )
-    )
+    }
 }

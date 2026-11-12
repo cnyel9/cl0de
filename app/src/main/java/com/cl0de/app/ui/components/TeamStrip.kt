@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,7 +52,7 @@ fun TeamStrip(id: String, nav: Nav) {
     val all by Graph.chats.allSessions.collectAsState()
     val statuses by Graph.chats.statuses.collectAsState()
     val chat = remember(id) { Graph.chats.chat(id) }
-    val lastUserAt = chat.messages.lastOrNull { it.info.isUser }?.info?.time?.created ?: 0L
+    val lastUserAt by remember(chat) { derivedStateOf { chat.messages.lastOrNull { it.info.isUser }?.info?.time?.created ?: 0L } }
     val kids = remember(all, id, lastUserAt) {
         val allKids = all.values.filter { it.parentID == id }.sortedBy { it.time.created }
         if (lastUserAt <= 0L) allKids else allKids.filter { it.time.created >= lastUserAt }
