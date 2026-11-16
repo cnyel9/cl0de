@@ -103,7 +103,13 @@ fun ProvidersScreen(nav: Nav) {
             item {
                 SettingsGroup {
                     available.take(60).forEach { p ->
-                        SettingsRow(p.name.ifBlank { p.id }, subtitle = p.id, icon = Ic.Plus, chevron = true, onClick = { connect = p })
+                        // MiMo has no auth flow to connect with: tapping it here
+                        // is the way back from a disconnect (enable clears the
+                        // disabled flag and re-registers the provider).
+                        SettingsRow(p.name.ifBlank { p.id }, subtitle = p.id, icon = Ic.Plus, chevron = true, onClick = {
+                            if (p.id == com.cl0de.app.data.MiMoModels.ID) scope.launch { com.cl0de.app.data.MiMoModels.enable(); load() }
+                            else connect = p
+                        })
                     }
                 }
             }
@@ -120,6 +126,7 @@ fun ProvidersScreen(nav: Nav) {
                 if (id == com.cl0de.app.data.FreeModels.COPILOT_ID || id == com.cl0de.app.data.FreeModels.POLLINATIONS_ID) com.cl0de.app.data.FreeModels.disable(id)
                 else if (id == com.cl0de.app.data.OfflineModels.ID) com.cl0de.app.data.OfflineModels.disable()
                 else if (id == com.cl0de.app.data.DeepModels.ID) com.cl0de.app.data.DeepModels.disable()
+                else if (id == com.cl0de.app.data.MiMoModels.ID) com.cl0de.app.data.MiMoModels.disable()
                 else runCatching { Graph.api.removeAuth(id); Graph.api.disposeAll() }
                 Graph.catalog.refresh(); load()
             }

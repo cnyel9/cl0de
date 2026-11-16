@@ -250,13 +250,13 @@ object OfflineModels {
     }
 
     /**
-     * Every light (tool-free) chat agent: offline's own and Deep's. They share
-     * the one saved-agent slot, so the helpers work on the SET, never on a
-     * single name: entering Deep straight from offline (or back) must not save
-     * a light agent as "the agent from before" and later hand a cloud session
-     * back to it, tools off, silently.
+     * Every light (tool-free) chat agent: offline's own, Deep's and MiMo's.
+     * They share the one saved-agent slot, so the helpers work on the SET,
+     * never on a single name: entering Deep straight from offline (or back)
+     * must not save a light agent as "the agent from before" and later hand
+     * a cloud session back to it, tools off, silently.
      */
-    private val lightAgents get() = setOf(AGENT, DeepModels.AGENT)
+    private val lightAgents get() = setOf(AGENT, DeepModels.AGENT, MiMoModels.AGENT)
 
     /** A light model takes the session over: remember the current agent (only when it isn't itself light), run as [agent]. */
     fun activateLightAgent(agent: String) {
@@ -287,7 +287,9 @@ object OfflineModels {
      * offline's own screen): a light provider activates its light agent, a tool
      * provider stops the local model server and hands the saved agent back. The
      * Deep bridge only warms up here (the send gate stays the arbiter) and is
-     * never stopped by a pick: its DeepChat session lives in its memory.
+     * never stopped by a pick: its DeepChat session lives in its memory. The
+     * MiMo bridge follows the same rule (its conversation map lives in its
+     * memory; the server-side conversations outlive it either way).
      */
     fun onModelPicked(providerId: String) {
         when (providerId) {
@@ -296,6 +298,11 @@ object OfflineModels {
                 Graph.runtime.stopLlama()
                 DeepModels.activateAgent()
                 Graph.runtime.startDeep()
+            }
+            MiMoModels.ID -> {
+                Graph.runtime.stopLlama()
+                MiMoModels.activateAgent()
+                Graph.runtime.startMiMo()
             }
             else -> {
                 Graph.runtime.stopLlama()
@@ -357,6 +364,10 @@ object OfflineModels {
     suspend fun ensureForSend(providerId: String, modelId: String) {
         if (providerId == DeepModels.ID && !Graph.devices.isRemote) {
             DeepModels.ensureForSend(modelId)
+            return
+        }
+        if (providerId == MiMoModels.ID && !Graph.devices.isRemote) {
+            MiMoModels.ensureForSend(modelId)
             return
         }
         if (providerId != ID) {

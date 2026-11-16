@@ -72,28 +72,31 @@ fun InterruptedCard(id: String) {
 }
 
 /**
- * The Deep info strip in chat: while a Deep model is selected, a thin pill
- * (AccessBanner's shape) states that Deep is everyday chat, not an agent. It
- * hides itself for any other provider. Dismissal is remembered per provider
- * only (not per model, and deliberately NOT persisted like the access
- * banner's): closing it silences it for every Deep model until the selection
- * leaves the Deep provider and comes back, or the app process restarts.
- * The text is never truncated: it wraps to as many lines as it needs so the
- * whole notice is always readable.
+ * The chat-only info strip in chat: while a Deep or MiMo model is selected,
+ * a thin pill (AccessBanner's shape) states that the provider is everyday
+ * chat, not an agent, with the text of the active provider. It hides itself
+ * for any other provider. Dismissal is remembered per provider only (not
+ * per model, and deliberately NOT persisted like the access banner's):
+ * closing it silences it for every model of that provider until the
+ * selection leaves the provider and comes back, or the app process
+ * restarts. The text is never truncated: it wraps to as many lines as it
+ * needs so the whole notice is always readable.
  */
 @Composable
 fun DeepInfoBanner() {
     val c = Oc.c
     val prefs = Graph.prefs
     var dismissed by remember(prefs.providerId) { mutableStateOf(false) }
-    if (prefs.providerId != com.cl0de.app.data.DeepModels.ID || dismissed) return
+    val isDeep = prefs.providerId == com.cl0de.app.data.DeepModels.ID
+    val isMiMo = prefs.providerId == com.cl0de.app.data.MiMoModels.ID
+    if ((!isDeep && !isMiMo) || dismissed) return
     Row(
         Modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth().clip(CircleShape).background(c.surface).border(1.dp, c.border, CircleShape)
             .padding(start = 16.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Ico(Ic.Chat, tint = c.textDim, size = 17.dp); Spacer(Modifier.width(10.dp))
-        Txt(SChat.deepChatOnly, Modifier.weight(1f), size = 14.sp)
+        Txt(if (isMiMo) SChat.mimoChatOnly else SChat.deepChatOnly, Modifier.weight(1f), size = 14.sp)
         IconBtn(Ic.Close, { dismissed = true }, tint = c.textDim, size = 38.dp, iconSize = 18.dp)
     }
 }
