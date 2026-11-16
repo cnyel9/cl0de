@@ -33,7 +33,7 @@ object Backup {
     private const val PREFS_FILE = "/root/.ocmobile-prefs.json"
     private const val TMP = "/tmp/ocmobile-backup.tgz"
     /** Heavy and recoverable things are left out. */
-    private val EXCLUDE = listOf("root/.cache", "root/.npm", "root/.bun/install/cache", "root/.local/share/opencode/log", "root/.local/share/opencode/bin", "root/outbox/opencode-backup-*", "*/node_modules")
+    private val EXCLUDE = listOf("root/.cache", "root/.npm", "root/.bun/install/cache", "root/.local/share/opencode/log", "root/.local/share/opencode/bin", "root/outbox/opencode-backup-*", "*/node_modules", "opt/deep")
 
     sealed interface State {
         data object Idle : State

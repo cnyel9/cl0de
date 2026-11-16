@@ -40,9 +40,14 @@ object BugReport {
         val pass = runCatching { Graph.prefs.serverPassword }.getOrDefault("")
         val secret = Regex("""(?i)(password|token|secret|api[_-]?key|authorization)(["'\s:=]+)\S+""")
         val keyLike = Regex("""\b(sk|ghp|gho|ghu|github_pat|xox[abp])[-_][A-Za-z0-9_\-]{8,}""")
+        // The MiMo bridge censors its own output already; this is the second
+        // layer for the same values if they ever reach a log line by another
+        // route (the module puts the ph token in its request URLs).
+        val mimoCookie = Regex("""(xiaomichatbot_\w+)=[^\s;"]+""")
         return lines.map { l ->
             var s = if (pass.isNotEmpty()) l.replace(pass, "***") else l
             s = secret.replace(s) { it.groupValues[1] + it.groupValues[2] + "***" }
+            s = mimoCookie.replace(s) { it.groupValues[1] + "=***" }
             keyLike.replace(s, "***")
         }
     }

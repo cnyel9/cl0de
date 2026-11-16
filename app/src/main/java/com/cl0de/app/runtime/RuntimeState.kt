@@ -16,6 +16,14 @@ sealed interface DeepState {
     data class Failed(val message: String) : DeepState
 }
 
+/** The MiMo bridge (a Node.js process in the same proot fronting the MiMo Studio module), supervised separately. */
+sealed interface MiMoState {
+    data object Stopped : MiMoState
+    data object Starting : MiMoState
+    data object Running : MiMoState
+    data class Failed(val message: String) : MiMoState
+}
+
 sealed interface RuntimeState {
     /** The environment isn't installed yet. */
     data object NotInstalled : RuntimeState

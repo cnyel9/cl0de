@@ -70,6 +70,7 @@ class ServerService : Service() {
         Graph.runtime.requestStop()
         Graph.runtime.stopLlama()
         Graph.runtime.stopDeep()
+        Graph.runtime.stopMiMo()
         scope.cancel()
         wake?.let { if (it.isHeld) it.release() }
         super.onDestroy()

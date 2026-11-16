@@ -1,6 +1,7 @@
 package com.cl0de.app.runtime
 
 import com.cl0de.app.data.SDeep
+import com.cl0de.app.data.SMiMo
 import com.cl0de.app.data.SOffline
 import com.cl0de.app.data.Vault
 import android.app.Application
@@ -18,6 +19,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
@@ -61,6 +64,16 @@ class RuntimeController(
         // The bundled DeepChat module is a third-party file kept byte-for-byte;
         // the pin is the gist revision the spike verified (ayashiiiyo rev 62bbbdb).
         const val DEEP_MODULE_SHA = "62e8885508f594012ffb8d4b4bafefc775ece69a091f79381b9c5b0910051a9a"
+        // The MiMo bridge: its own port, staged in the Deep directory (the two
+        // bridges' file sets are disjoint). The bundled MiMo module is a
+        // third-party file kept byte-for-byte; the pin is the revision the
+        // spike verified (FruatreMaou, 16 Nov 2026).
+        const val MIMO_PORT = 8182
+        const val MIMO_MODULE_SHA = "b7ea23b48ea09efdb502c9822ab6c076e5221fc54ee08cf5c361e71c12cda05d"
+        // The repo's mimocook.txt asset is this pure sentinel; CI replaces it
+        // with the real session cookie from a repo secret at build time. The
+        // sentinel carries no real key names on purpose.
+        const val MIMO_COOKIE_PLACEHOLDER = "CI-INJECTED-AT-BUILD"
     }
 
     val state = MutableStateFlow<RuntimeState>(
@@ -821,13 +834,22 @@ class RuntimeController(
         true
     }.getOrElse { e -> deepLog("staging failed: ${e.message}"); false }
 
+    // One lock for the shared Node.js provisioning: the Deep and MiMo
+    // supervisors both call ensureNodeRuntime() on their start paths, and on
+    // a fresh rootfs two concurrent first starts would race the same apt-get
+    // install (one loses the dpkg lock and lands its bridge in a false
+    // Failed). nodePath is shared state for the same reason.
+    private val nodeMutex = Mutex()
+
     /**
      * The rootfs setup installs no JavaScript runtime: check for node inside
      * the guest, and install the distro nodejs package when it is missing.
-     * Idempotent (the check comes first), and on the bridge's start path, so
+     * Idempotent (the check comes first), and on the bridges' start path, so
      * fresh and long-lived rootfs installs are provisioned alike.
      */
-    private suspend fun ensureNodeRuntime(): Boolean {
+    private suspend fun ensureNodeRuntime(): Boolean = nodeMutex.withLock { ensureNodeRuntimeLocked() }
+
+    private suspend fun ensureNodeRuntimeLocked(): Boolean {
         suspend fun findNode(): String? {
             val out = StringBuilder()
             val code = runCatching {
@@ -837,17 +859,246 @@ class RuntimeController(
             return out.toString().lineSequence().map { it.trim() }.lastOrNull { it.startsWith("/") && it.endsWith("node") }
         }
         findNode()?.let { nodePath = it; return true }
-        deepLog("Node.js is not in the environment yet, installing it (one time)…")
+        logLine("Node.js is not in the environment yet, installing it (one time)…")
         val code = runCatching {
             runGuest(listOf("/bin/bash", "-lc", "apt-get update && apt-get install -y --no-install-recommends nodejs"), timeoutSec = 1200)
         }.getOrDefault(-1)
-        if (code != 0) { deepLog("Node.js install failed (exit $code)"); return false }
+        if (code != 0) { logLine("Node.js install failed (exit $code)"); return false }
         val found = findNode()
-        if (found == null) { deepLog("Node.js install finished but node is still not on the guest PATH"); return false }
+        if (found == null) { logLine("Node.js install finished but node is still not on the guest PATH"); return false }
         nodePath = found
-        deepLog("Node.js is ready: $found")
+        logLine("Node.js is ready: $found")
         return true
     }
+
+    // ---------- MiMo bridge (MiMo Studio provider) ----------
+    // A third sibling supervision, next to Deep's: its own process, port,
+    // stop flag and state, so nothing here can disturb the OpenCode server,
+    // the offline-model server or the Deep bridge. Like Deep it is NOT
+    // stopped when the app backgrounds or the selected provider changes
+    // (its conversation map lives in its memory), its health endpoint is
+    // local liveness only, and it shares the Deep bridge's Node.js runtime
+    // (provisioned once, under nodeMutex) and staging directory (the two
+    // bridges' file sets are disjoint). Start is lazy (a model pick warms
+    // it up), the send gate is the arbiter.
+
+    val mimoState = MutableStateFlow<MiMoState>(MiMoState.Stopped)
+
+    @Volatile private var mimoProcess: Process? = null
+    @Volatile private var mimoStopRequested = false
+    /** Bumped on every start/stop transition: a superseded supervisor never touches the newer one's process. */
+    @Volatile private var mimoGeneration = 0
+    private var mimoJob: Job? = null
+    private val mimoScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val mimoLock = Any()
+    private val mimoHttp = OkHttpClient.Builder().connectTimeout(3, TimeUnit.SECONDS).build()
+
+    private fun mimoLog(s: String) = logLine("[mimo] $s")
+
+    /**
+     * Local liveness only: the bridge answers /health while its process lives,
+     * with its service marker in the body (so a foreign process that happens to
+     * hold the port is never adopted as the bridge). It says nothing about the
+     * MiMo cookie or the network, on purpose.
+     */
+    fun mimoHealthy(callTimeoutSec: Long): Boolean = try {
+        val c = mimoHttp.newBuilder().callTimeout(callTimeoutSec, TimeUnit.SECONDS).build()
+        c.newCall(Request.Builder().url("http://127.0.0.1:$MIMO_PORT/health").build()).execute().use {
+            it.isSuccessful && (it.body?.string()?.contains("cl0de-mimo-bridge") == true)
+        }
+    } catch (e: Exception) { false }
+
+    fun startMiMo() {
+        synchronized(mimoLock) {
+            val cur = mimoState.value
+            if (mimoJob?.isActive == true && (cur is MiMoState.Starting || cur is MiMoState.Running)) return
+            mimoStopRequested = false
+            val gen = ++mimoGeneration
+            mimoState.value = MiMoState.Starting
+            mimoJob = mimoScope.launch { superviseMiMo(gen) }
+        }
+    }
+
+    /** Stop and wait: the caller (reset, service teardown) needs the process really gone. */
+    fun stopMiMo() {
+        val p: Process?
+        synchronized(mimoLock) {
+            mimoStopRequested = true
+            mimoGeneration++
+            mimoJob?.cancel()
+            mimoJob = null
+            p = mimoProcess
+        }
+        if (p != null) {
+            p.destroy()
+            if (p.isAlive) { runCatching { p.waitFor(3, TimeUnit.SECONDS) }; if (p.isAlive) p.destroyForcibly() }
+            synchronized(mimoLock) { if (mimoProcess == p) mimoProcess = null }
+        }
+        if (mimoState.value !is MiMoState.Stopped) mimoState.value = MiMoState.Stopped
+    }
+
+    private suspend fun superviseMiMo(gen: Int) = withContext(Dispatchers.IO) {
+        fun stale() = gen != mimoGeneration || mimoStopRequested
+        // the same gate as the Deep supervisor: never race the runtime setup
+        while (isActive && !stale() && (installing || !paths.rootfsReady)) {
+            if (state.value is RuntimeState.InstallFailed || (state.value is RuntimeState.NotInstalled && !installing)) {
+                mimoState.value = MiMoState.Failed(SMiMo.failRuntimeNotReady)
+                return@withContext
+            }
+            delay(1000)
+        }
+        if (stale() || !isActive) return@withContext
+        // The module, bridge and cookie bytes in the rootfs must match this
+        // build's assets before anything spawns (same reasoning as Deep's
+        // staging: an app update is how a new module or cookie lands).
+        if (!stageMiMoFiles()) { mimoState.value = MiMoState.Failed(SMiMo.failStaging); return@withContext }
+        if (stale() || !isActive) return@withContext
+        // The Node.js runtime is shared with the Deep bridge and provisioned
+        // under a lock (see ensureNodeRuntime), so two first starts on a
+        // fresh rootfs cannot race the install.
+        if (!ensureNodeRuntime()) { mimoState.value = MiMoState.Failed(SMiMo.failNoNode); return@withContext }
+        var failures = 0
+        while (isActive && !stale()) {
+            if (!awaitMiMoPortFree(gen)) {
+                if (stale()) break
+                failures++
+                mimoLog("port $MIMO_PORT stayed busy, retrying shortly")
+                delay((1500L * failures).coerceAtMost(30_000))
+                continue
+            }
+            mimoState.value = MiMoState.Starting
+            // direct argv through proot, foreground, like the Deep bridge: no
+            // shell wrapper and no daemonizing, so the Process held here is
+            // the bridge
+            val pb = ProcessBuilder(proot.build(listOf(nodePath, "$DEEP_DIR/mimo-bridge.mjs"), cwd = "/root")).redirectErrorStream(true)
+            pb.environment().putAll(proot.env())
+            val spawnedAt = System.currentTimeMillis()
+            val p = try { pb.start() } catch (e: Exception) {
+                mimoLog("could not start proot: ${e.message}")
+                failures++
+                delay((1500L * failures).coerceAtMost(30_000))
+                continue
+            }
+            synchronized(mimoLock) { mimoProcess = p }
+            mimoLog("bridge process started, waiting for it to answer…")
+            val reader = launch { runCatching { p.inputStream.bufferedReader().forEachLine { mimoLog(it) } } }
+            var healthy = false
+            var dog: Job? = null
+            try {
+                // quiet startup grace, like Deep: poll every second, a failure
+                // here never counts and never restarts anything
+                while (isActive && !stale() && p.isAlive && !healthy) {
+                    healthy = mimoHealthy(2)
+                    if (!healthy) delay(1000)
+                }
+                if (healthy) {
+                    mimoState.value = MiMoState.Running
+                    failures = 0
+                    mimoLog("bridge is up on port $MIMO_PORT (took ${(System.currentTimeMillis() - spawnedAt) / 1000}s)")
+                    // the watchdog only judges a bridge that already answered
+                    // once, with the same patient rules as Deep's
+                    dog = launch {
+                        var bad = 0
+                        while (isActive && !stale() && p.isAlive) {
+                            delay(WATCHDOG_INTERVAL_MS)
+                            if (mimoHealthy(15)) bad = 0 else {
+                                bad++
+                                mimoLog("watchdog: health check failed ($bad/3)")
+                                if (bad >= 3) { mimoLog("watchdog: bridge stopped answering, restarting it"); p.destroy(); break }
+                            }
+                        }
+                    }
+                    runInterruptible { p.waitFor() }
+                }
+            } finally {
+                dog?.cancel()
+                p.destroy()
+                if (p.isAlive) { runCatching { p.waitFor(3, TimeUnit.SECONDS) }; if (p.isAlive) p.destroyForcibly() }
+                synchronized(mimoLock) { if (mimoProcess == p) mimoProcess = null }
+                // drain the reader before the death is logged below, so the
+                // bridge's last lines are not lost
+                withTimeoutOrNull(2_000) { reader.join() }
+                reader.cancel()
+            }
+            if (stale() || !isActive) break
+            failures++
+            val code = runCatching { p.exitValue() }.getOrDefault(-1)
+            val restartIn = (1500L * failures).coerceAtMost(30_000)
+            // one atomic line per death, like Deep's: exit code, lifetime,
+            // whether it ever answered a health check, and what happens next
+            mimoLog(
+                "bridge exited (code $code) after ${(System.currentTimeMillis() - spawnedAt) / 1000}s" +
+                    (if (healthy) ", after it had answered a health check" else ", before it ever answered a health check") +
+                    " — restarting in ${restartIn / 1000}s",
+            )
+            mimoState.value = MiMoState.Starting
+            delay(restartIn)
+        }
+        if (mimoState.value !is MiMoState.Failed) mimoState.value = MiMoState.Stopped
+    }
+
+    /** The Deep twin of awaitPortFree, watching the mimo stop flag and generation instead. */
+    private suspend fun awaitMiMoPortFree(gen: Int): Boolean {
+        fun free(): Boolean = try {
+            ServerSocket().apply { reuseAddress = true; bind(InetSocketAddress("127.0.0.1", MIMO_PORT)); close() }
+            true
+        } catch (e: Exception) { false }
+        if (free()) return true
+        mimoLog("port $MIMO_PORT is still held by a previous process, waiting for it to free up")
+        val deadline = System.currentTimeMillis() + PORT_FREE_WAIT_MS
+        while (!mimoStopRequested && gen == mimoGeneration && System.currentTimeMillis() < deadline) {
+            delay(1000)
+            if (free()) { mimoLog("port $MIMO_PORT is free again"); return true }
+        }
+        return !mimoStopRequested && gen == mimoGeneration && free()
+    }
+
+    /**
+     * Copy the MiMo module, the bridge and the session cookie from the APK
+     * assets into the rootfs staging directory (shared with Deep's files;
+     * the sets are disjoint), host-side as the app. Only ever called while
+     * no MiMo bridge process is running.
+     *
+     * The module is pinned by sha256 like Deep's. The cookie is NOT pinned
+     * (it rotates) and is handled differently on purpose: it is validated
+     * instead (an empty file, the CI placeholder sentinel, or a file with
+     * no ph key name are all refused, so a build that somehow shipped
+     * without the real cookie fails loudly here instead of running a
+     * bridge that fails every call upstream), and it is ALWAYS overwritten
+     * (delete first, then write), never skipped on a sha match, so a
+     * rotated cookie in a new build always lands. Validation looks at key
+     * NAMES only; the staged file then stays next to mimo.js for the whole
+     * runtime, because the module re-reads it on every call and its first
+     * lookup candidate is the module's own directory.
+     */
+    private fun stageMiMoFiles(): Boolean = runCatching {
+        paths.host(DEEP_DIR).mkdirs()
+        fun stage(asset: String, guest: String, pinnedSha: String?) {
+            val bytes = app.assets.open(asset).use { it.readBytes() }
+            val assetSha = sha256Hex(bytes)
+            if (pinnedSha != null) check(assetSha == pinnedSha) { "bundled $asset does not match its pinned sha256" }
+            val target = paths.host(guest)
+            val stagedSha = if (target.isFile) sha256Hex(target.readBytes()) else null
+            if (stagedSha != assetSha) {
+                target.delete()
+                target.writeBytes(bytes)
+            }
+            check(sha256Hex(target.readBytes()) == assetSha) { "staged $guest failed verification" }
+        }
+        stage("mimo.js", "$DEEP_DIR/mimo.js", MIMO_MODULE_SHA)
+        stage("mimo-bridge.mjs", "$DEEP_DIR/mimo-bridge.mjs", null)
+        val cookieBytes = app.assets.open("mimocook.txt").use { it.readBytes() }
+        val cookieText = cookieBytes.toString(Charsets.UTF_8)
+        check(cookieBytes.isNotEmpty()) { "bundled mimocook.txt is empty" }
+        check(!cookieText.contains(MIMO_COOKIE_PLACEHOLDER)) { "bundled mimocook.txt is still the CI placeholder" }
+        check(cookieText.contains("xiaomichatbot_ph")) { "bundled mimocook.txt has no xiaomichatbot_ph key" }
+        val cookieTarget = paths.host("$DEEP_DIR/mimocook.txt")
+        cookieTarget.delete()
+        cookieTarget.writeBytes(cookieBytes)
+        val stagedCookie = cookieTarget.readText()
+        check(stagedCookie.isNotEmpty() && stagedCookie.contains("xiaomichatbot_ph")) { "staged mimocook.txt failed verification" }
+        true
+    }.getOrElse { e -> mimoLog("staging failed: ${e.message}"); false }
 
     fun resetRuntime() {
         Vault.save()
@@ -856,6 +1107,10 @@ class RuntimeController(
         // dead before the rootfs is deleted (resetRuntime never waited for
         // llama; the bridge does not inherit that race)
         stopDeep()
+        // the MiMo bridge likewise: an orphaned process would hold port
+        // 8182 forever and answer the next bridge's health gate with the
+        // right marker, so the new bridge could never start
+        stopMiMo()
         paths.rootfs.deleteRecursively()
         paths.downloads.deleteRecursively()
         prefs.runtimeReady = false
