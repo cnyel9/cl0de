@@ -38,6 +38,21 @@ jobs:
           test -n "$KEYSTORE_B64" || { echo "SIGNING_KEYSTORE_B64 secret is missing"; exit 1; }
           echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/cl0de.keystore"
 
+      # MiMo session cookie from a secret, decoded over the placeholder asset
+      # so it ships inside the APK (every install can use MiMo with no login).
+      # This second build path needs the same step and the same fail-closed
+      # guard as build-cl0de.yml, or a tag release would silently ship the
+      # placeholder. The checks only test existence, a key NAME and a hash.
+      - name: MiMo cookie
+        env:
+          MIMO_COOKIE_B64: ${{ secrets.MIMO_COOKIE_B64 }}
+        run: |
+          test -n "$MIMO_COOKIE_B64" || { echo "MIMO_COOKIE_B64 secret is missing"; exit 1; }
+          echo "$MIMO_COOKIE_B64" | base64 -d > app/src/main/assets/mimocook.txt
+          test -s app/src/main/assets/mimocook.txt || { echo "Decoded MiMo cookie is empty"; exit 1; }
+          grep -q "xiaomichatbot_ph" app/src/main/assets/mimocook.txt || { echo "Decoded MiMo cookie has no xiaomichatbot_ph key"; exit 1; }
+          if echo "80f3e604347183626b009d27d263dfe714fa5e902c3f92482deda3e99962f8ff  app/src/main/assets/mimocook.txt" | sha256sum -c - >/dev/null 2>&1; then echo "MiMo cookie is still the placeholder"; exit 1; fi
+
       - name: Build
         env:
           SIGNING_KEYSTORE_PATH: ${{ runner.temp }}/cl0de.keystore
