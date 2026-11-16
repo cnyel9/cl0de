@@ -5,6 +5,7 @@ import com.cl0de.app.api.EventHub
 import com.cl0de.app.api.OpenCodeApi
 import com.cl0de.app.data.Catalog
 import com.cl0de.app.data.DeepModels
+import com.cl0de.app.data.MiMoModels
 import com.cl0de.app.data.LiveNotify
 import com.cl0de.app.data.PhoneBridge
 import com.cl0de.app.data.Devices
@@ -86,6 +87,9 @@ object Graph {
         // fresh-install default); the sync verifies itself and retries on the
         // next Running when it didn't land
         scope.launch { runtime.state.collect { if (it is com.cl0de.app.runtime.RuntimeState.Running) DeepModels.syncProvider() } }
+        // the server is up: the MiMo provider registers itself the same way
+        // (no default seeding; Deep's default stays untouched)
+        scope.launch { runtime.state.collect { if (it is com.cl0de.app.runtime.RuntimeState.Running) MiMoModels.syncProvider() } }
         Memory.sync()
         com.cl0de.app.data.AppLang.applyRule()
         Vault.restore()

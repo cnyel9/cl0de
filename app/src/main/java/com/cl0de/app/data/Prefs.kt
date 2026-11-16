@@ -123,6 +123,10 @@ class Prefs(ctx: Context) {
     var deepSeedPending by bool("deep_seed_pending", false)
     var deepSeedDone by bool("deep_seed_done", false)
 
+    // MiMo provider (MiMo Studio bridge in the same rootfs)
+    /** The user disconnected MiMo in Providers: auto-registration stays off (set by MiMoModels.disable, cleared by MiMoModels.enable). */
+    var mimoDisabled by bool("mimo_disabled", false)
+
     // Offline models (llama-server in the same rootfs)
     /** How ggml found its CPU backend last time: "", "auto", or a guest path to a backend .so. */
     var llamaBackend by str("llama_backend", "")
