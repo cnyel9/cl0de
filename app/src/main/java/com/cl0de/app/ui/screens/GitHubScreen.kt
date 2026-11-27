@@ -69,8 +69,14 @@ fun GitHubScreen(nav: Nav) {
     val scope = rememberCoroutineScope()
     val prefs = Graph.prefs
     val st by GitHub.state.collectAsState()
+    val ghHealth by GitHub.health.collectAsState()
     var identity by remember { mutableStateOf<Pair<String, String>?>(null) }
-    LaunchedEffect(st, prefs.githubLogin) { if (GitHub.signedIn) identity = GitHub.gitIdentity() }
+    LaunchedEffect(st, prefs.githubLogin) {
+        if (GitHub.signedIn) {
+            identity = GitHub.gitIdentity()
+            GitHub.checkHealth()
+        }
+    }
     val look = Oc.look.id
     val mono = if (look == "hairline" || look == "terminal") Oc.mono else null
 
@@ -100,6 +106,22 @@ fun GitHubScreen(nav: Nav) {
                             SettingsRow(SAcct.commitsAs, subtitle = identity?.let { "${it.first} <${it.second}>" } ?: "…", icon = Ic.Git)
                             SettingsRow(SAcct.noAiCoAuthors, subtitle = SAcct.commitsYoursAlone, icon = Ic.User)
                             SettingsRow(SAcct.whatOpenCodeCanDo, subtitle = SAcct.githubCapabilities, icon = Ic.GitHub)
+                            SettingsRow(
+                                SAcct.githubConnection,
+                                subtitle = when (val h = ghHealth) {
+                                    GitHub.Health.Unknown -> SAcct.githubHealthUnknown
+                                    GitHub.Health.Checking -> SAcct.githubHealthChecking
+                                    GitHub.Health.EnvNotReady -> SAcct.githubHealthEnvNotReady
+                                    is GitHub.Health.Ok -> SAcct.githubHealthOk(h.login)
+                                    GitHub.Health.NotLoggedIn -> SAcct.githubHealthNotLoggedIn
+                                    GitHub.Health.TokenRejected -> SAcct.githubHealthTokenRejected
+                                    GitHub.Health.HelperMissing -> SAcct.githubHealthHelperMissing
+                                    is GitHub.Health.Unreachable -> SAcct.githubHealthUnreachable
+                                    is GitHub.Health.Broken -> h.detail.ifBlank { SAcct.githubHealthBroken }
+                                },
+                                icon = Ic.GitHub,
+                                onClick = { if (ghHealth !is GitHub.Health.Checking) scope.launch { GitHub.checkHealth() } },
+                            )
                         }
                         Spacer(Modifier.height(18.dp))
                         Txt(
@@ -107,7 +129,14 @@ fun GitHubScreen(nav: Nav) {
                             Modifier.padding(horizontal = 20.dp), size = 15.sp, color = c.textDim, lineHeight = 21.sp,
                         )
                         Spacer(Modifier.height(18.dp))
-                        Row(Modifier.padding(horizontal = 16.dp)) { SmallButton(SAcct.signOut, { scope.launch { GitHub.signOut() } }, danger = true) }
+                        Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            SmallButton(SAcct.signOut, { scope.launch { GitHub.signOut() } }, danger = true)
+                            when (ghHealth) {
+                                GitHub.Health.HelperMissing -> SmallButton(SAcct.repairConnection, { scope.launch { GitHub.repair() } })
+                                GitHub.Health.NotLoggedIn, GitHub.Health.TokenRejected -> SmallButton(SAcct.signInAgain, { scope.launch { GitHub.signIn() } })
+                                else -> {}
+                            }
+                        }
                     }
                     else -> Column(Modifier.padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Spacer(Modifier.height(28.dp))

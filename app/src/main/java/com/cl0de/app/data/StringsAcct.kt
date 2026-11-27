@@ -80,6 +80,18 @@ object SAcct {
     val signInWithGitHub get() = AppLang.s("Masuk dengan GitHub", "Sign in with GitHub")
     val installsGitGh get() = AppLang.s("Memasang git dan GitHub CLI di Ubuntu, sekitar 30 MB.", "Installs git and the GitHub CLI in Ubuntu, about 30 MB.")
     val copyAndOpenGitHub get() = AppLang.s("Salin dan buka GitHub", "Copy and open GitHub")
+    val githubConnection get() = AppLang.s("Status sambungan", "Connection status")
+    val githubHealthChecking get() = AppLang.s("Memeriksa…", "Checking…")
+    val githubHealthUnknown get() = AppLang.s("Belum diperiksa", "Not checked yet")
+    fun githubHealthOk(login: String) = AppLang.s("Terhubung sebagai @$login", "Connected as @$login")
+    val githubHealthHelperMissing get() = AppLang.s("Git untuk push belum siap", "Git is not ready to push")
+    val githubHealthNotLoggedIn get() = AppLang.s("Sesi berakhir, masuk ulang", "Session ended, sign in again")
+    val githubHealthTokenRejected get() = AppLang.s("Token ditolak GitHub, masuk ulang", "GitHub rejected the token, sign in again")
+    val githubHealthUnreachable get() = AppLang.s("Tidak terjangkau, periksa sambungan internet", "Unreachable, check the internet connection")
+    val githubHealthEnvNotReady get() = AppLang.s("Lingkungan belum siap", "Environment not ready yet")
+    val githubHealthBroken get() = AppLang.s("Sambungan bermasalah", "Connection problem")
+    val repairConnection get() = AppLang.s("Perbaiki sambungan", "Repair connection")
+    val signInAgain get() = AppLang.s("Masuk ulang", "Sign in again")
     val waitingForApprove get() = AppLang.s("Menunggu persetujuan Anda…", "Waiting for you to approve…")
 
     // CodeScreen / remote devices

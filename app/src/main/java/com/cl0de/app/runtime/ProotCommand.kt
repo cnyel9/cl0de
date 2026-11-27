@@ -2,6 +2,7 @@ package com.cl0de.app.runtime
 
 import com.cl0de.app.data.Prefs
 import java.io.File
+import java.nio.file.Files
 
 /** Builds the proot command line: a guest Ubuntu with fake root and a "proper" /proc. */
 class ProotCommand(private val paths: RuntimePaths, private val prefs: Prefs) {
@@ -16,6 +17,7 @@ class ProotCommand(private val paths: RuntimePaths, private val prefs: Prefs) {
     /** [guestArgv] runs inside the rootfs under `env -i` with a clean environment. */
     fun build(guestArgv: List<String>, cwd: String = "/root", extraEnv: Map<String, String> = emptyMap()): List<String> {
         prepareFakeProc()
+        prepareResolvConf()
         val cmd = mutableListOf(
             paths.proot.path,
             "--kernel-release=6.2.1-PRoot-Distro",
@@ -77,5 +79,33 @@ class ProotCommand(private val paths: RuntimePaths, private val prefs: Prefs) {
     private fun write(name: String, text: String) {
         val f = File(paths.fake, name)
         if (!f.exists() || f.readText() != text) f.writeText(text)
+    }
+
+    /**
+     * The guest's nameservers, re-asserted before every spawn. configureRootfs()
+     * writes /etc/resolv.conf once at unpack; after that anything running as root
+     * inside the guest can clobber it and nothing would ever repair it, so every
+     * process built here (server, runGuest, llama, the bridges) first makes sure
+     * the file still holds exactly the three public nameservers (three is the
+     * most glibc reads). Ubuntu ships the file as a symlink into /run: a symlink
+     * is replaced, never written through, because from the host its target would
+     * resolve on Android, not in the guest. A file that already matches is left
+     * untouched. Replacement writes a sibling temp file and renames it over the
+     * target, so a guest process that is already alive never sees the file
+     * missing. Any failure is swallowed: DNS repair must never block a spawn.
+     */
+    private fun prepareResolvConf() {
+        runCatching {
+            val want = "nameserver 1.1.1.1\nnameserver 8.8.8.8\nnameserver 9.9.9.9\n"
+            val f = File(paths.rootfs, "etc/resolv.conf")
+            if (!Files.isSymbolicLink(f.toPath()) && f.isFile && f.readText() == want) return
+            f.parentFile?.mkdirs()
+            val tmp = File(f.parentFile, "resolv.conf.cl0de-new")
+            tmp.writeText(want)
+            if (!tmp.renameTo(f)) {
+                if (Files.isSymbolicLink(f.toPath()) || f.exists()) f.delete()
+                tmp.renameTo(f)
+            }
+        }
     }
 }
